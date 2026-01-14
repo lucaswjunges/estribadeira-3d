@@ -1007,22 +1007,29 @@
                                 subGroup.rotation[rotationAxis] = newAngle;
                             }
 
-                            // Controlar posicao do Pino Guia baseado no angulo da Bracadeira
+                            // Controlar posicao do Pino Guia e Eixo Vertical baseado no angulo da Bracadeira
                             if (subConfig.controlsPinoGuia) {
+                                // Normalizar angulo entre 0 e 1
+                                const angleRange = subConfig.maxAngle - subConfig.minAngle;
+                                const normalizedAngle = (subGroup.rotation[rotationAxis] - subConfig.minAngle) / angleRange;
+                                const deslocamento = 50 * normalizedAngle;
+
+                                // Pino Guia
                                 const pinoGuia = partMeshes[30];
                                 if (pinoGuia) {
-                                    // Normalizar angulo entre 0 e 1
-                                    const angleRange = subConfig.maxAngle - subConfig.minAngle;
-                                    const normalizedAngle = (subGroup.rotation[rotationAxis] - subConfig.minAngle) / angleRange;
-
-                                    // Posicao Z varia baseado no angulo (desliza para frente/tras)
-                                    // Guarda posicao inicial se ainda nao existir
                                     if (pinoGuia.userData.initialZ === undefined) {
                                         pinoGuia.userData.initialZ = pinoGuia.position.z;
                                     }
-                                    // Desloca ate 50 unidades baseado no angulo
-                                    const deslocamento = 50 * normalizedAngle;
                                     pinoGuia.position.z = pinoGuia.userData.initialZ - deslocamento;
+                                }
+
+                                // Eixo Vertical
+                                const eixoVertical = partMeshes[24];
+                                if (eixoVertical) {
+                                    if (eixoVertical.userData.initialZ === undefined) {
+                                        eixoVertical.userData.initialZ = eixoVertical.position.z;
+                                    }
+                                    eixoVertical.position.z = eixoVertical.userData.initialZ - deslocamento;
                                 }
                             }
                         } else {
