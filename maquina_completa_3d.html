@@ -405,7 +405,12 @@
         // Configuracao de animacao das pecas rotativas individuais
         // (giram no proprio eixo, sem orbitar)
         const animatedParts = {
-            29: { axis: 'x', speed: 0.0075 },  // Engrenagem Z2 - gira no proprio eixo X
+            29: { axis: 'x', speed: -0.0075 },  // Engrenagem Z2 - gira no proprio eixo X (sentido oposto)
+            53: { axis: 'z', speed: -0.01 },   // Placa Fixacao 1 - gira em Z (sentido oposto)
+            54: { axis: 'z', speed: -0.01 },   // Placa Fixacao 2 - gira em Z (sentido oposto)
+            55: { axis: 'z', speed: 0.01 },    // Placa Fixacao 3 - gira em Z
+            56: { axis: 'z', speed: 0.01 },    // Placa Fixacao 4 - gira em Z
+            57: { axis: 'z', speed: -0.01 },   // Placa Fixacao 5 - gira em Z (sentido oposto)
             62: { axis: 'z', speed: 0.01 },    // Rolamento 7 - gira em Z
         };
 
@@ -436,11 +441,12 @@
                 ],
                 // Sub-grupos que giram dentro deste grupo
                 subGroups: {
-                    // Placa Motor - gira no proprio eixo (engrenagem)
+                    // Placa Motor - gira sincronizada com mecanismoDobrador
                     placaMotorGira: {
                         pivot: [432.2, -240.46, 159.8],  // Centro da Placa Motor
                         axis: 'z',  // Gira em Z (perpendicular a placa)
                         speed: 0.01,
+                        syncWithDobrador: true,  // Sincroniza com mecanismoDobrador
                         parts: [
                             15,  // Placa Motor
                         ]
@@ -991,7 +997,12 @@
                             case 'z': rotationAxis = 'z'; break;
                         }
 
-                        if (subConfig.oscillate) {
+                        // Sincronizar com mecanismoDobrador (sentido oposto)
+                        if (subConfig.syncWithDobrador) {
+                            const dobradorConfig = mechanicalGroups.eixoPrincipal.subGroups.mecanismoDobrador;
+                            subGroup.rotation[rotationAxis] += subConfig.speed * (-dobradorConfig.direction);
+                        }
+                        else if (subConfig.oscillate) {
                             // Movimento oscilatorio com limites
                             const currentAngle = subGroup.rotation[rotationAxis];
                             const newAngle = currentAngle + subConfig.speed * subConfig.direction;
