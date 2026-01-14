@@ -405,7 +405,7 @@
         // Configuracao de animacao das pecas rotativas individuais
         // (giram no proprio eixo, sem orbitar)
         const animatedParts = {
-            29: { axis: 'x', speed: 0.03 },  // Engrenagem Z2 - gira no proprio eixo X
+            29: { axis: 'x', speed: 0.0075 },  // Engrenagem Z2 - gira no proprio eixo X
         };
 
         // Grupos mecanicos - pecas que giram juntas em torno de um pivo comum
@@ -415,7 +415,7 @@
             eixoPrincipal: {
                 pivot: [300, -240.5, 185],  // Centro aproximado no eixo do arame
                 axis: 'x',
-                speed: 0.02,
+                speed: 0.005,
                 parts: [
                     28,  // Engrenagem Z 1
                     1,   // Eixo Guia Arame
@@ -433,9 +433,6 @@
                     17,  // Porca 1
                     18,  // Porca 2
                     19,  // Rolamento 1
-                    21,  // Parafuso 1
-                    22,  // Parafuso 2
-                    23,  // Parafuso 3
                 ],
                 // Sub-grupos que giram dentro deste grupo
                 subGroups: {
@@ -443,18 +440,36 @@
                     mecanismoDobrador: {
                         pivot: [492.2, -240.43, 156.35],  // Centro da Coluna 1
                         axis: 'z',  // Oscila em Z ao redor da Coluna 1
-                        speed: 0.04,
+                        speed: 0.01,
                         oscillate: true,  // Oscila em vez de girar continuamente
                         minAngle: 175 * Math.PI / 180,  // Limite minimo (175 graus)
                         maxAngle: 375 * Math.PI / 180,  // Limite maximo (375 graus)
-                        direction: -1,  // Direcao inicial (-1 = anti-horario, começa indo para -65)
+                        direction: -1,  // Direcao inicial
                         parts: [
                             20,  // Bloco Dobrador
+                            21,  // Parafuso 1
+                            22,  // Parafuso 2
+                            23,  // Parafuso 3
                             24,  // Eixo Vertical
-                            25,  // Bracadeira Eixo
                             26,  // Motor Principal
-                            30,  // Pino Guia
-                        ]
+                            30,  // Pino Guia (fica no mesmo plano, so desliza)
+                        ],
+                        subGroups: {
+                            // Bracadeira Eixo - oscila e controla o Pino Guia
+                            bracadeiraEixo: {
+                                pivot: [504.92, -215.6, 121.08],  // Centro real da Bracadeira Eixo
+                                axis: 'y',  // Oscila em Y
+                                speed: 0.0075,
+                                oscillate: true,
+                                minAngle: 0,  // 0 graus
+                                maxAngle: Math.PI,  // 180 graus
+                                direction: 1,
+                                controlsPinoGuia: true,  // Flag especial para controlar o Pino Guia
+                                parts: [
+                                    25,  // Bracadeira Eixo
+                                ]
+                            }
+                        }
                     }
                 }
             }
@@ -981,6 +996,25 @@
                                 subConfig.direction = 1;
                             } else {
                                 subGroup.rotation[rotationAxis] = newAngle;
+                            }
+
+                            // Controlar posicao do Pino Guia baseado no angulo da Bracadeira
+                            if (subConfig.controlsPinoGuia) {
+                                const pinoGuia = partMeshes[30];
+                                if (pinoGuia) {
+                                    // Normalizar angulo entre 0 e 1
+                                    const angleRange = subConfig.maxAngle - subConfig.minAngle;
+                                    const normalizedAngle = (subGroup.rotation[rotationAxis] - subConfig.minAngle) / angleRange;
+
+                                    // Posicao Z varia baseado no angulo (desliza para frente/tras)
+                                    // Guarda posicao inicial se ainda nao existir
+                                    if (pinoGuia.userData.initialZ === undefined) {
+                                        pinoGuia.userData.initialZ = pinoGuia.position.z;
+                                    }
+                                    // Desloca ate 50 unidades baseado no angulo
+                                    const deslocamento = 50 * normalizedAngle;
+                                    pinoGuia.position.z = pinoGuia.userData.initialZ - deslocamento;
+                                }
                             }
                         } else {
                             // Rotacao continua
