@@ -144,7 +144,7 @@
 
         .legend-panel {
             position: absolute;
-            top: 100px;
+            top: 20px;
             right: 20px;
             background: rgba(26, 26, 26, 0.95);
             padding: 15px;
@@ -281,6 +281,95 @@
             0xFF5722, 0x009688, 0xCDDC39, 0x673AB7, 0x03A9F4,
             0x795548, 0x607D8B, 0xFFEB3B, 0x00E676, 0xD500F9
         ];
+
+        // Nomes das pecas baseados em analise das dimensoes
+        const partNames = {
+            0: "Base Principal",
+            1: "Eixo Guia Arame",
+            2: "Suporte Lateral E",
+            3: "Suporte Lateral D",
+            4: "Engrenagem Alimentador 1",
+            5: "Engrenagem Alimentador 2",
+            6: "Mancal Esquerdo",
+            7: "Mancal Direito",
+            8: "Espacador E",
+            9: "Espacador D",
+            10: "Arruela 1",
+            11: "Arruela 2",
+            12: "Placa Secundaria",
+            13: "Suporte Motor NEMA",
+            14: "Caixa Engrenagens",
+            15: "Placa Motor",
+            16: "Coluna 1",
+            17: "Porca 1",
+            18: "Porca 2",
+            19: "Rolamento 1",
+            20: "Bloco Dobrador",
+            21: "Parafuso 1",
+            22: "Parafuso 2",
+            23: "Parafuso 3",
+            24: "Eixo Vertical",
+            25: "Bracadeira Eixo",
+            26: "Motor Principal",
+            27: "Servo Motor 1",
+            28: "Engrenagem Z 1",
+            29: "Engrenagem Z 2",
+            30: "Pino Guia",
+            31: "Trilho Superior",
+            32: "Trilho Inferior",
+            33: "Coluna 2",
+            34: "Rolamento 2",
+            35: "Porca 3",
+            36: "Coluna 3",
+            37: "Coluna 4",
+            38: "Porca 4",
+            39: "Porca 5",
+            40: "Rolamento 3",
+            41: "Rolamento 4",
+            42: "Porca 6",
+            43: "Porca 7",
+            44: "Coluna 5",
+            45: "Coluna 6",
+            46: "Porca 8",
+            47: "Porca 9",
+            48: "Porca 10",
+            49: "Porca 11",
+            50: "Rolamento 5",
+            51: "Rolamento 6",
+            52: "Servo Motor 2",
+            53: "Placa Fixacao 1",
+            54: "Placa Fixacao 2",
+            55: "Placa Fixacao 3",
+            56: "Placa Fixacao 4",
+            57: "Placa Fixacao 5",
+            58: "Espacador Longo",
+            59: "Espacador Curto",
+            60: "Suporte Alimentador",
+            61: "Coluna 7",
+            62: "Rolamento 7",
+            63: "Porca 12",
+            64: "Coluna 8",
+            65: "Arruela Fina",
+            66: "Porca 13",
+            67: "Porca 14",
+            68: "Guia Arame E",
+            69: "Bracadeira E",
+            70: "Bracadeira D",
+            71: "Guia Arame D",
+            72: "Bocal Dobrador",
+            73: "Arruela 3",
+            74: "Porca 15",
+            75: "Arruela 4",
+            76: "Arruela 5",
+            77: "Arruela 6",
+            78: "Arruela 7",
+            79: "Barra Estrutural 1",
+            80: "Barra Estrutural 2",
+            81: "Barra Estrutural 3",
+            82: "Barra Estrutural 4",
+            83: "Placa Base Inferior",
+            84: "Conector"
+        };
 
         let loadedCount = 0;
         let totalParts = 0;
@@ -426,11 +515,10 @@
 
                 const nameSpan = document.createElement('span');
                 nameSpan.className = 'legend-name';
-                // Simplificar o nome removendo prefixo comum
-                let displayName = part.name.replace('Automatic_3D_Wire_Bending_Machine', 'Peca');
-                if (displayName === 'Peca') displayName = 'Peca_000';
+                // Usar nome descritivo do mapeamento
+                let displayName = partNames[index] || `Peca ${index}`;
                 nameSpan.textContent = displayName;
-                nameSpan.title = `${part.name} (${part.faces} faces)`;
+                nameSpan.title = `${displayName} (${part.faces} faces)`;
 
                 item.appendChild(colorBox);
                 item.appendChild(nameSpan);
@@ -503,7 +591,7 @@
                         const mesh = new THREE.Mesh(geometry, material);
                         mesh.castShadow = true;
                         mesh.receiveShadow = true;
-                        mesh.userData.partName = part.name;
+                        mesh.userData.partName = partNames[index] || `Peca ${index}`;
                         mesh.userData.partIndex = index;
 
                         // Posicionar na posicao original do STEP
