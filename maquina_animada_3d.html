@@ -1,0 +1,698 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Wire Bending Machine 3D - Simulacao Animada</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', sans-serif;
+            background: #1a1a1a;
+            color: #e0e0e0;
+            overflow: hidden;
+            height: 100vh;
+        }
+        #canvas3d { width: 100%; height: 100%; }
+
+        .overlay {
+            position: absolute;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(26, 26, 26, 0.95);
+            padding: 15px 30px;
+            border-radius: 8px;
+            border: 2px solid #00ff88;
+            text-align: center;
+            z-index: 100;
+        }
+        .overlay h2 { font-size: 18px; color: #00ff88; }
+        .overlay p { font-size: 11px; color: #888; margin-top: 5px; }
+
+        .loading {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(26, 26, 26, 0.95);
+            padding: 40px 60px;
+            border-radius: 10px;
+            border: 2px solid #00ff88;
+            text-align: center;
+            z-index: 200;
+        }
+        .loading h3 { color: #00ff88; margin-bottom: 20px; }
+        .loading-bar {
+            width: 250px; height: 8px;
+            background: #2a2a2a;
+            border-radius: 4px;
+            overflow: hidden;
+        }
+        .loading-progress {
+            height: 100%;
+            background: linear-gradient(90deg, #00ff88, #3a7bc8);
+            width: 0%;
+            transition: width 0.3s;
+        }
+        .loading-text { margin-top: 15px; font-size: 13px; color: #888; }
+
+        .controls {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            background: rgba(26, 26, 26, 0.95);
+            padding: 20px;
+            border-radius: 8px;
+            border: 1px solid #3a3a3a;
+            z-index: 100;
+            min-width: 200px;
+        }
+        .controls h4 { color: #00ff88; margin-bottom: 15px; font-size: 14px; }
+
+        .btn {
+            width: 100%;
+            padding: 12px;
+            margin-bottom: 8px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: 600;
+            transition: all 0.2s;
+        }
+        .btn-primary {
+            background: linear-gradient(135deg, #00ff88, #00cc6a);
+            color: #1a1a1a;
+        }
+        .btn-primary:hover { transform: translateY(-2px); }
+        .btn-primary:disabled { background: #3a3a3a; color: #666; cursor: not-allowed; transform: none; }
+        .btn-secondary { background: #3a3a3a; color: #e0e0e0; }
+        .btn-secondary:hover { background: #4a4a4a; }
+        .btn-danger { background: #cc3333; color: white; }
+        .btn-danger:hover { background: #dd4444; }
+
+        .speed-control { margin: 15px 0; }
+        .speed-control label { font-size: 11px; color: #888; }
+        .speed-control input { width: 100%; margin-top: 5px; }
+
+        .status {
+            margin-top: 15px;
+            padding: 10px;
+            background: #0d0d0d;
+            border-radius: 4px;
+            text-align: center;
+        }
+        .status-label { font-size: 10px; color: #666; text-transform: uppercase; }
+        .status-value { font-size: 16px; color: #00ff88; font-family: monospace; margin-top: 5px; }
+        .status-value.running { color: #ff9500; animation: pulse 1s infinite; }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+
+        .info {
+            position: absolute;
+            top: 100px;
+            right: 20px;
+            background: rgba(26, 26, 26, 0.95);
+            padding: 15px;
+            border-radius: 8px;
+            border: 1px solid #3a3a3a;
+            z-index: 100;
+            font-size: 11px;
+        }
+        .info h4 { color: #3a7bc8; margin-bottom: 10px; }
+        .info p { color: #888; margin: 4px 0; }
+    </style>
+</head>
+<body>
+    <div class="overlay">
+        <h2>Wire Bending Machine - Simulacao</h2>
+        <p>HowToMechatronics | Pecas Animadas</p>
+    </div>
+
+    <div class="loading" id="loadingScreen">
+        <h3>Carregando Componentes</h3>
+        <div class="loading-bar">
+            <div class="loading-progress" id="loadingProgress"></div>
+        </div>
+        <div class="loading-text" id="loadingText">Iniciando...</div>
+    </div>
+
+    <div class="controls">
+        <h4>Controle da Simulacao</h4>
+
+        <button class="btn btn-primary" id="btnStart">Iniciar Ciclo</button>
+        <button class="btn btn-danger" id="btnStop" disabled>Parar</button>
+
+        <div class="speed-control">
+            <label>Velocidade: <span id="speedValue">1.0x</span></label>
+            <input type="range" id="speedSlider" min="0.1" max="3" step="0.1" value="1">
+        </div>
+
+        <button class="btn btn-secondary" id="btnReset">Resetar Camera</button>
+        <button class="btn btn-secondary" id="btnWireframe">Wireframe</button>
+
+        <div class="status">
+            <div class="status-label">Status</div>
+            <div class="status-value" id="statusValue">PARADO</div>
+        </div>
+    </div>
+
+    <div class="info">
+        <h4>Controles Camera</h4>
+        <p>Arrastar: Rotacionar</p>
+        <p>Scroll: Zoom</p>
+        <p>Shift+Arrastar: Mover</p>
+    </div>
+
+    <div id="canvas3d"></div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/STLLoader.js"></script>
+
+    <script>
+        // ============================================================================
+        // VARIAVEIS GLOBAIS
+        // ============================================================================
+        let scene, camera, renderer, controls;
+        let isRunning = false;
+        let animationSpeed = 1.0;
+        let isWireframe = false;
+        let loadedCount = 0;
+
+        // Grupos de pecas para animacao
+        const parts = {
+            feeder: null,           // Rolo alimentador (gira para alimentar arame)
+            straightener: null,     // Rolos endireitadores
+            zGear1: null,           // Engrenagem Z principal (gira eixo Z)
+            zGear2: null,           // Engrenagem Z secundaria (motor)
+            benderGear1: null,      // Engrenagem dobra principal
+            benderGear2: null,      // Engrenagem dobra motor
+            benderNozzle: null,     // Bico dobrador (gira para dobrar)
+            rackPin: null,          // Pino cremalheira
+            servoPinion: null,      // Pinhao servo
+            pillowBlock1: null,     // Mancal 1
+            pillowBlock2: null,     // Mancal 2
+            shaftClamp1: null,      // Bracadeira 1
+            shaftClamp2: null,      // Bracadeira 2
+            nemaMount: null         // Suporte motor
+        };
+
+        // Fio sendo dobrado
+        let wirePoints = [];
+        let wireMesh = null;
+
+        // Estado da simulacao
+        let simState = 'idle'; // idle, feeding, bending_z, bending, retracting
+        let simProgress = 0;
+        let cycleStep = 0;
+
+        // Ciclo de operacoes (simula dobra de estribo)
+        const CYCLE = [
+            { action: 'feed', duration: 100 },
+            { action: 'bend', angle: 90, duration: 50 },
+            { action: 'feed', duration: 100 },
+            { action: 'bend', angle: 90, duration: 50 },
+            { action: 'feed', duration: 100 },
+            { action: 'bend', angle: 90, duration: 50 },
+            { action: 'feed', duration: 100 },
+            { action: 'bend', angle: 90, duration: 50 },
+            { action: 'retract', duration: 30 }
+        ];
+
+        // ============================================================================
+        // CONFIGURACAO DAS PECAS
+        // ============================================================================
+        const PARTS_CONFIG = [
+            {
+                key: 'feeder',
+                file: 'Feeder.STL',
+                color: 0x4a90d9,
+                position: { x: 0, y: 150, z: 0 },
+                rotation: { x: -Math.PI/2, y: 0, z: 0 },
+                animAxis: 'z',  // Eixo de rotacao na animacao
+                animType: 'feed' // Tipo de animacao
+            },
+            {
+                key: 'straightener',
+                file: 'Straightener roller.STL',
+                color: 0x888888,
+                position: { x: -80, y: 150, z: 0 },
+                rotation: { x: 0, y: 0, z: Math.PI/2 },
+                animAxis: 'y',
+                animType: 'feed'
+            },
+            {
+                key: 'zGear1',
+                file: 'Z-axis gear 1.STL',
+                color: 0x3d7cbf,
+                position: { x: 0, y: 80, z: 0 },
+                rotation: { x: -Math.PI/2, y: 0, z: 0 },
+                animAxis: 'z',
+                animType: 'z_rotation'
+            },
+            {
+                key: 'zGear2',
+                file: 'Z-axis gear 2.STL',
+                color: 0x5588cc,
+                position: { x: 50, y: 80, z: 0 },
+                rotation: { x: -Math.PI/2, y: 0, z: 0 },
+                animAxis: 'z',
+                animType: 'z_rotation',
+                animRatio: -1.67  // Ratio de engrenagem (30/18)
+            },
+            {
+                key: 'benderGear1',
+                file: 'Bender gear 1.STL',
+                color: 0x2d6caf,
+                position: { x: 0, y: 0, z: 0 },
+                rotation: { x: -Math.PI/2, y: 0, z: 0 },
+                animAxis: 'z',
+                animType: 'bend'
+            },
+            {
+                key: 'benderGear2',
+                file: 'bender gear modified.STL',
+                color: 0x4478bc,
+                position: { x: 60, y: 0, z: 0 },
+                rotation: { x: -Math.PI/2, y: 0, z: 0 },
+                animAxis: 'z',
+                animType: 'bend',
+                animRatio: -1.67
+            },
+            {
+                key: 'benderNozzle',
+                file: 'Bender nozzle.STL',
+                color: 0xff6600,
+                position: { x: 0, y: -20, z: 40 },
+                rotation: { x: 0, y: 0, z: 0 },
+                animAxis: 'y',
+                animType: 'bend_arm'
+            },
+            {
+                key: 'rackPin',
+                file: 'rack pin.STL',
+                color: 0xcc4400,
+                position: { x: 20, y: -20, z: 50 },
+                rotation: { x: Math.PI/2, y: 0, z: 0 },
+                animAxis: null,
+                animType: 'none'
+            },
+            {
+                key: 'servoPinion',
+                file: 'Servo - pinion gear.STL',
+                color: 0x666666,
+                position: { x: 40, y: -20, z: 40 },
+                rotation: { x: 0, y: 0, z: 0 },
+                animAxis: 'x',
+                animType: 'bend_servo'
+            },
+            {
+                key: 'pillowBlock1',
+                file: 'Pillow block.STL',
+                color: 0x3a6090,
+                position: { x: 0, y: 110, z: 0 },
+                rotation: { x: -Math.PI/2, y: 0, z: 0 },
+                animAxis: null,
+                animType: 'none'
+            },
+            {
+                key: 'pillowBlock2',
+                file: 'Pillow block.STL',
+                color: 0x3a6090,
+                position: { x: 0, y: 50, z: 0 },
+                rotation: { x: -Math.PI/2, y: 0, z: 0 },
+                animAxis: null,
+                animType: 'none'
+            },
+            {
+                key: 'shaftClamp1',
+                file: 'Shaft clamp.STL',
+                color: 0x4a7ab0,
+                position: { x: 0, y: 30, z: 35 },
+                rotation: { x: 0, y: 0, z: 0 },
+                animAxis: null,
+                animType: 'none'
+            },
+            {
+                key: 'shaftClamp2',
+                file: 'Shaft clamp.STL',
+                color: 0x4a7ab0,
+                position: { x: 0, y: 30, z: -35 },
+                rotation: { x: 0, y: Math.PI, z: 0 },
+                animAxis: null,
+                animType: 'none'
+            },
+            {
+                key: 'nemaMount',
+                file: 'Nema 17 mount.STL',
+                color: 0x333333,
+                position: { x: 70, y: 80, z: 0 },
+                rotation: { x: -Math.PI/2, y: 0, z: 0 },
+                animAxis: null,
+                animType: 'none'
+            }
+        ];
+
+        // ============================================================================
+        // INICIALIZACAO
+        // ============================================================================
+        function init() {
+            const container = document.getElementById('canvas3d');
+
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x1a1a1a);
+
+            camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 1, 5000);
+            camera.position.set(250, 200, 300);
+
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+            renderer.shadowMap.enabled = true;
+            container.appendChild(renderer.domElement);
+
+            controls = new THREE.OrbitControls(camera, renderer.domElement);
+            controls.enableDamping = true;
+            controls.dampingFactor = 0.05;
+            controls.target.set(0, 50, 0);
+
+            setupLights();
+            createEnvironment();
+            createStructure();
+            loadAllParts();
+            setupUI();
+
+            window.addEventListener('resize', onWindowResize);
+            animate();
+        }
+
+        function setupLights() {
+            scene.add(new THREE.AmbientLight(0xffffff, 0.5));
+
+            const main = new THREE.DirectionalLight(0xffffff, 0.8);
+            main.position.set(200, 300, 200);
+            main.castShadow = true;
+            scene.add(main);
+
+            scene.add(new THREE.DirectionalLight(0x88aaff, 0.3).translateX(-100).translateY(100));
+        }
+
+        function createEnvironment() {
+            const grid = new THREE.GridHelper(500, 25, 0x444444, 0x333333);
+            grid.position.y = -80;
+            scene.add(grid);
+        }
+
+        function createStructure() {
+            // Base de madeira
+            const woodMat = new THREE.MeshStandardMaterial({ color: 0x8B4513, roughness: 0.8 });
+
+            // Placa superior
+            const top = new THREE.Mesh(new THREE.BoxGeometry(180, 10, 140), woodMat);
+            top.position.set(0, 130, 0);
+            top.castShadow = true;
+            scene.add(top);
+
+            // Placa inferior
+            const bottom = new THREE.Mesh(new THREE.BoxGeometry(180, 10, 140), woodMat);
+            bottom.position.set(0, -70, 0);
+            bottom.castShadow = true;
+            scene.add(bottom);
+
+            // Colunas
+            const colMat = new THREE.MeshStandardMaterial({ color: 0x9B5523, roughness: 0.7 });
+            [[-70, -55], [-70, 55], [70, -55], [70, 55]].forEach(([x, z]) => {
+                const col = new THREE.Mesh(new THREE.BoxGeometry(20, 200, 20), colMat);
+                col.position.set(x, 30, z);
+                col.castShadow = true;
+                scene.add(col);
+            });
+
+            // Tubo central (eixo Z)
+            const tubeMat = new THREE.MeshStandardMaterial({ color: 0xB87333, metalness: 0.8, roughness: 0.3 });
+            const tube = new THREE.Mesh(new THREE.CylinderGeometry(8, 8, 220, 32), tubeMat);
+            tube.position.set(0, 30, 0);
+            scene.add(tube);
+
+            // Motores NEMA (representacao)
+            const motorMat = new THREE.MeshStandardMaterial({ color: 0x222222, metalness: 0.5 });
+
+            // Motor Z
+            const motorZ = new THREE.Mesh(new THREE.BoxGeometry(42, 42, 40), motorMat);
+            motorZ.position.set(90, 80, 0);
+            motorZ.castShadow = true;
+            scene.add(motorZ);
+
+            // Motor alimentador
+            const motorFeed = new THREE.Mesh(new THREE.BoxGeometry(42, 42, 40), motorMat);
+            motorFeed.position.set(0, 180, 0);
+            motorFeed.rotation.x = Math.PI/2;
+            motorFeed.castShadow = true;
+            scene.add(motorFeed);
+
+            // Motor dobra
+            const motorBend = new THREE.Mesh(new THREE.BoxGeometry(50, 50, 48), motorMat);
+            motorBend.position.set(100, 0, 0);
+            motorBend.castShadow = true;
+            scene.add(motorBend);
+        }
+
+        // ============================================================================
+        // CARREGAMENTO DAS PECAS
+        // ============================================================================
+        function loadAllParts() {
+            const loader = new THREE.STLLoader();
+            const total = PARTS_CONFIG.length;
+
+            PARTS_CONFIG.forEach((config, index) => {
+                loader.load(
+                    'models/' + config.file,
+                    (geometry) => {
+                        geometry.computeBoundingBox();
+                        geometry.center();
+
+                        const material = new THREE.MeshStandardMaterial({
+                            color: config.color,
+                            metalness: 0.4,
+                            roughness: 0.5
+                        });
+
+                        const mesh = new THREE.Mesh(geometry, material);
+                        mesh.position.set(config.position.x, config.position.y, config.position.z);
+                        mesh.rotation.set(config.rotation.x, config.rotation.y, config.rotation.z);
+                        mesh.castShadow = true;
+                        mesh.receiveShadow = true;
+
+                        // Guardar config de animacao
+                        mesh.userData.animAxis = config.animAxis;
+                        mesh.userData.animType = config.animType;
+                        mesh.userData.animRatio = config.animRatio || 1;
+                        mesh.userData.baseRotation = { ...config.rotation };
+
+                        parts[config.key] = mesh;
+                        scene.add(mesh);
+
+                        loadedCount++;
+                        updateLoading(loadedCount / total * 100, `Carregado: ${config.key}`);
+
+                        if (loadedCount === total) {
+                            finishLoading();
+                        }
+                    },
+                    undefined,
+                    (error) => {
+                        console.error('Erro:', config.file, error);
+                        loadedCount++;
+                        if (loadedCount === total) finishLoading();
+                    }
+                );
+            });
+        }
+
+        function updateLoading(percent, text) {
+            document.getElementById('loadingProgress').style.width = percent + '%';
+            document.getElementById('loadingText').textContent = text;
+        }
+
+        function finishLoading() {
+            document.getElementById('loadingScreen').style.display = 'none';
+            createWire();
+        }
+
+        // ============================================================================
+        // FIO (ARAME)
+        // ============================================================================
+        function createWire() {
+            wirePoints = [
+                new THREE.Vector3(-150, 150, 0),
+                new THREE.Vector3(0, 150, 0),
+                new THREE.Vector3(0, 80, 0),
+                new THREE.Vector3(0, 0, 0)
+            ];
+            updateWireMesh();
+        }
+
+        function updateWireMesh() {
+            if (wireMesh) {
+                scene.remove(wireMesh);
+                wireMesh.geometry.dispose();
+            }
+
+            if (wirePoints.length < 2) return;
+
+            const curve = new THREE.CatmullRomCurve3(wirePoints, false, 'catmullrom', 0.1);
+            const geo = new THREE.TubeGeometry(curve, wirePoints.length * 10, 2, 8, false);
+            const mat = new THREE.MeshStandardMaterial({
+                color: 0xcccccc,
+                metalness: 0.7,
+                roughness: 0.3
+            });
+
+            wireMesh = new THREE.Mesh(geo, mat);
+            wireMesh.castShadow = true;
+            scene.add(wireMesh);
+        }
+
+        // ============================================================================
+        // ANIMACAO / SIMULACAO
+        // ============================================================================
+        function startSimulation() {
+            if (isRunning) return;
+            isRunning = true;
+            simState = 'running';
+            cycleStep = 0;
+            simProgress = 0;
+            updateStatus('EXECUTANDO', true);
+            document.getElementById('btnStart').disabled = true;
+            document.getElementById('btnStop').disabled = false;
+        }
+
+        function stopSimulation() {
+            isRunning = false;
+            simState = 'idle';
+            updateStatus('PARADO', false);
+            document.getElementById('btnStart').disabled = false;
+            document.getElementById('btnStop').disabled = true;
+        }
+
+        function updateStatus(text, running) {
+            const el = document.getElementById('statusValue');
+            el.textContent = text;
+            el.classList.toggle('running', running);
+        }
+
+        function updateSimulation() {
+            if (!isRunning) return;
+
+            const speed = animationSpeed * 2;
+
+            // Animacao continua das engrenagens enquanto roda
+            animateParts(speed);
+
+            // Logica do ciclo
+            if (cycleStep < CYCLE.length) {
+                const step = CYCLE[cycleStep];
+                simProgress += speed;
+
+                if (simProgress >= step.duration) {
+                    simProgress = 0;
+                    cycleStep++;
+
+                    if (cycleStep >= CYCLE.length) {
+                        // Ciclo completo - reinicia
+                        cycleStep = 0;
+                        createWire(); // Reset wire
+                    }
+                }
+            }
+        }
+
+        function animateParts(speed) {
+            const feedRotation = speed * 0.05;
+            const bendRotation = speed * 0.03;
+
+            // Alimentador e endireitador giram
+            if (parts.feeder) {
+                parts.feeder.rotation.z += feedRotation;
+            }
+            if (parts.straightener) {
+                parts.straightener.rotation.y += feedRotation;
+            }
+
+            // Engrenagens Z giram
+            if (parts.zGear1) {
+                parts.zGear1.rotation.z += bendRotation * 0.5;
+            }
+            if (parts.zGear2) {
+                parts.zGear2.rotation.z -= bendRotation * 0.5 * 1.67;
+            }
+
+            // Engrenagens de dobra
+            if (parts.benderGear1) {
+                parts.benderGear1.rotation.z += bendRotation;
+            }
+            if (parts.benderGear2) {
+                parts.benderGear2.rotation.z -= bendRotation * 1.67;
+            }
+
+            // Bico dobrador oscila
+            if (parts.benderNozzle) {
+                parts.benderNozzle.rotation.y = Math.sin(Date.now() * 0.003 * speed) * 0.5;
+            }
+
+            // Pinhao servo
+            if (parts.servoPinion) {
+                parts.servoPinion.rotation.x += bendRotation * 2;
+            }
+        }
+
+        // ============================================================================
+        // UI
+        // ============================================================================
+        function setupUI() {
+            document.getElementById('btnStart').onclick = startSimulation;
+            document.getElementById('btnStop').onclick = stopSimulation;
+            document.getElementById('btnReset').onclick = resetCamera;
+            document.getElementById('btnWireframe').onclick = toggleWireframe;
+
+            document.getElementById('speedSlider').oninput = (e) => {
+                animationSpeed = parseFloat(e.target.value);
+                document.getElementById('speedValue').textContent = animationSpeed.toFixed(1) + 'x';
+            };
+        }
+
+        function resetCamera() {
+            camera.position.set(250, 200, 300);
+            controls.target.set(0, 50, 0);
+        }
+
+        function toggleWireframe() {
+            isWireframe = !isWireframe;
+            Object.values(parts).forEach(mesh => {
+                if (mesh && mesh.material) {
+                    mesh.material.wireframe = isWireframe;
+                }
+            });
+        }
+
+        // ============================================================================
+        // LOOP
+        // ============================================================================
+        function animate() {
+            requestAnimationFrame(animate);
+            updateSimulation();
+            controls.update();
+            renderer.render(scene, camera);
+        }
+
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        init();
+    </script>
+</body>
+</html>

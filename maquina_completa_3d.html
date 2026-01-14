@@ -43,12 +43,6 @@
             font-weight: 600;
         }
 
-        .overlay p {
-            font-size: 11px;
-            color: #888;
-            margin-top: 5px;
-        }
-
         .loading {
             position: absolute;
             top: 50%;
@@ -148,69 +142,92 @@
             background: #4a4a4a;
         }
 
-        .info-panel {
+        .legend-panel {
             position: absolute;
             top: 100px;
             right: 20px;
             background: rgba(26, 26, 26, 0.95);
-            padding: 20px;
+            padding: 15px;
             border-radius: 8px;
             border: 1px solid #3a3a3a;
             z-index: 100;
-            min-width: 220px;
+            max-width: 280px;
+            max-height: calc(100vh - 200px);
+            overflow-y: auto;
         }
 
-        .info-panel h4 {
+        .legend-panel h4 {
             color: #00ff88;
-            margin-bottom: 15px;
+            margin-bottom: 12px;
             font-size: 14px;
             border-bottom: 1px solid #3a3a3a;
-            padding-bottom: 10px;
+            padding-bottom: 8px;
         }
 
-        .info-row {
-            display: flex;
-            justify-content: space-between;
-            padding: 6px 0;
-            font-size: 12px;
-        }
-
-        .info-label {
-            color: #888;
-        }
-
-        .info-value {
-            color: #00ff88;
-            font-family: monospace;
-        }
-
-        .model-source {
-            position: absolute;
-            bottom: 20px;
-            left: 50%;
-            transform: translateX(-50%);
-            background: rgba(26, 26, 26, 0.9);
-            padding: 8px 20px;
-            border-radius: 20px;
+        .legend-stats {
             font-size: 11px;
-            color: #666;
-            z-index: 100;
+            color: #888;
+            margin-bottom: 10px;
+            padding-bottom: 8px;
+            border-bottom: 1px solid #2a2a2a;
         }
 
-        .model-source a {
-            color: #3a7bc8;
-            text-decoration: none;
+        .legend-item {
+            display: flex;
+            align-items: center;
+            padding: 4px 5px;
+            font-size: 10px;
+            cursor: pointer;
+            transition: background 0.2s;
+            border-radius: 4px;
+        }
+
+        .legend-item:hover {
+            background: rgba(255, 255, 255, 0.1);
+        }
+
+        .legend-item.highlighted {
+            background: rgba(0, 255, 136, 0.2);
+        }
+
+        .legend-color {
+            width: 14px;
+            height: 14px;
+            border-radius: 3px;
+            margin-right: 8px;
+            flex-shrink: 0;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .legend-name {
+            color: #ccc;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .legend-panel::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .legend-panel::-webkit-scrollbar-track {
+            background: #2a2a2a;
+            border-radius: 3px;
+        }
+
+        .legend-panel::-webkit-scrollbar-thumb {
+            background: #555;
+            border-radius: 3px;
         }
     </style>
 </head>
 <body>
     <div class="overlay">
         <h2>Automatic 3D Wire Bending Machine</h2>
-        <p>Modelo Completo - HowToMechatronics / Thangs</p>
     </div>
 
     <div class="loading" id="loadingScreen">
-        <h3>Carregando Modelo 3D Completo</h3>
+        <h3>Carregando Modelo 3D</h3>
         <div class="loading-bar">
             <div class="loading-progress" id="loadingProgress"></div>
         </div>
@@ -225,28 +242,10 @@
         <p>Duplo clique: Centralizar</p>
     </div>
 
-    <div class="info-panel">
-        <h4>Informacoes do Modelo</h4>
-        <div class="info-row">
-            <span class="info-label">Formato:</span>
-            <span class="info-value">GLB (glTF Binary)</span>
-        </div>
-        <div class="info-row">
-            <span class="info-label">Tamanho:</span>
-            <span class="info-value">~4.9 MB</span>
-        </div>
-        <div class="info-row">
-            <span class="info-label">Vertices:</span>
-            <span class="info-value" id="vertexCount">-</span>
-        </div>
-        <div class="info-row">
-            <span class="info-label">Triangulos:</span>
-            <span class="info-value" id="triangleCount">-</span>
-        </div>
-        <div class="info-row">
-            <span class="info-label">Objetos:</span>
-            <span class="info-value" id="objectCount">-</span>
-        </div>
+    <div class="legend-panel" id="legendPanel">
+        <h4>Pecas do Modelo</h4>
+        <div class="legend-stats" id="legendStats">Carregando...</div>
+        <div id="legendItems"></div>
     </div>
 
     <div class="btn-group">
@@ -254,10 +253,6 @@
         <button class="btn btn-secondary" onclick="toggleWireframe()">Wireframe</button>
         <button class="btn btn-secondary" onclick="toggleAutoRotate()">Auto Rotacao</button>
         <button class="btn btn-secondary" onclick="cycleBackground()">Mudar Fundo</button>
-    </div>
-
-    <div class="model-source">
-        Modelo: <a href="https://thangs.com/m/44026" target="_blank">HowToMechatronics @ Thangs</a>
     </div>
 
     <div id="canvas3d"></div>
@@ -272,10 +267,23 @@
         // VARIAVEIS GLOBAIS
         // ============================================================================
         let scene, camera, renderer, controls;
-        let model = null;
+        let modelGroup = null;
+        let partMeshes = [];
+        let partsManifest = null;
         let isWireframe = false;
         let backgroundIndex = 0;
         const backgrounds = [0x1a1a1a, 0x2a3a4a, 0x3a2a3a, 0x1a2a1a, 0x000000];
+
+        // Paleta de cores distintas (20 cores que se repetem)
+        const colorPalette = [
+            0x4CAF50, 0x2196F3, 0xF44336, 0xFF9800, 0x9C27B0,
+            0x00BCD4, 0xFFC107, 0xE91E63, 0x8BC34A, 0x3F51B5,
+            0xFF5722, 0x009688, 0xCDDC39, 0x673AB7, 0x03A9F4,
+            0x795548, 0x607D8B, 0xFFEB3B, 0x00E676, 0xD500F9
+        ];
+
+        let loadedCount = 0;
+        let totalParts = 0;
 
         // ============================================================================
         // INICIALIZACAO
@@ -327,8 +335,12 @@
             grid.position.y = -10;
             scene.add(grid);
 
-            // Carregar modelo GLB
-            loadGLBModel();
+            // Grupo para o modelo
+            modelGroup = new THREE.Group();
+            scene.add(modelGroup);
+
+            // Carregar manifest e depois as pecas
+            loadManifest();
 
             // Eventos
             window.addEventListener('resize', onWindowResize);
@@ -374,82 +386,187 @@
         }
 
         // ============================================================================
-        // CARREGAMENTO DO MODELO STL (Maquina Completa)
+        // CARREGAMENTO DO MANIFEST
         // ============================================================================
-        function loadGLBModel() {
+        function loadManifest() {
+            updateLoading(5, 'Carregando manifest...');
+
+            fetch('models/parts_manifest.json')
+                .then(response => response.json())
+                .then(data => {
+                    partsManifest = data;
+                    totalParts = data.parts.length;
+                    console.log(`Manifest carregado: ${totalParts} pecas`);
+                    createLegend();
+                    loadAllParts();
+                })
+                .catch(error => {
+                    console.error('Erro ao carregar manifest:', error);
+                    document.getElementById('loadingText').textContent = 'Erro ao carregar manifest!';
+                });
+        }
+
+        // ============================================================================
+        // CRIACAO DA LEGENDA
+        // ============================================================================
+        function createLegend() {
+            const legendItems = document.getElementById('legendItems');
+            legendItems.innerHTML = '';
+
+            partsManifest.parts.forEach((part, index) => {
+                const color = colorPalette[index % colorPalette.length];
+
+                const item = document.createElement('div');
+                item.className = 'legend-item';
+                item.dataset.index = index;
+
+                const colorBox = document.createElement('div');
+                colorBox.className = 'legend-color';
+                colorBox.style.backgroundColor = '#' + color.toString(16).padStart(6, '0');
+
+                const nameSpan = document.createElement('span');
+                nameSpan.className = 'legend-name';
+                // Simplificar o nome removendo prefixo comum
+                let displayName = part.name.replace('Automatic_3D_Wire_Bending_Machine', 'Peca');
+                if (displayName === 'Peca') displayName = 'Peca_000';
+                nameSpan.textContent = displayName;
+                nameSpan.title = `${part.name} (${part.faces} faces)`;
+
+                item.appendChild(colorBox);
+                item.appendChild(nameSpan);
+
+                // Interatividade
+                item.addEventListener('mouseenter', () => highlightPart(index, true));
+                item.addEventListener('mouseleave', () => highlightPart(index, false));
+                item.addEventListener('click', () => focusOnPart(index));
+
+                legendItems.appendChild(item);
+            });
+        }
+
+        function highlightPart(index, highlight) {
+            const mesh = partMeshes[index];
+            if (mesh) {
+                if (highlight) {
+                    mesh.userData.originalEmissive = mesh.material.emissive.getHex();
+                    mesh.material.emissive.setHex(0x444444);
+                } else {
+                    mesh.material.emissive.setHex(mesh.userData.originalEmissive || 0x000000);
+                }
+            }
+
+            const legendItem = document.querySelector(`.legend-item[data-index="${index}"]`);
+            if (legendItem) {
+                legendItem.classList.toggle('highlighted', highlight);
+            }
+        }
+
+        function focusOnPart(index) {
+            const mesh = partMeshes[index];
+            if (mesh) {
+                const box = new THREE.Box3().setFromObject(mesh);
+                const center = box.getCenter(new THREE.Vector3());
+                const size = box.getSize(new THREE.Vector3());
+                const maxDim = Math.max(size.x, size.y, size.z);
+
+                controls.target.copy(center);
+                const distance = Math.max(maxDim * 3, 50);
+                const direction = new THREE.Vector3().subVectors(camera.position, controls.target).normalize();
+                camera.position.copy(center).add(direction.multiplyScalar(distance));
+            }
+        }
+
+        // ============================================================================
+        // CARREGAMENTO DAS PECAS
+        // ============================================================================
+        function loadAllParts() {
             const loader = new THREE.STLLoader();
 
-            // Arquivo STL completo convertido do STEP
-            const stlFile = 'models/wire_bending_machine_complete.stl';
+            updateLoading(10, 'Carregando pecas...');
 
-            updateLoading(10, 'Iniciando download...');
+            partsManifest.parts.forEach((part, index) => {
+                const filePath = 'models/parts/' + part.file;
+                const color = colorPalette[index % colorPalette.length];
 
-            loader.load(
-                stlFile,
-                (geometry) => {
-                    console.log('STL carregado!');
+                loader.load(
+                    filePath,
+                    (geometry) => {
+                        // Material com cor especifica
+                        const material = new THREE.MeshStandardMaterial({
+                            color: color,
+                            metalness: 0.4,
+                            roughness: 0.5,
+                            flatShading: false
+                        });
 
-                    // Centralizar geometria
-                    geometry.computeBoundingBox();
-                    geometry.center();
+                        // Criar mesh
+                        const mesh = new THREE.Mesh(geometry, material);
+                        mesh.castShadow = true;
+                        mesh.receiveShadow = true;
+                        mesh.userData.partName = part.name;
+                        mesh.userData.partIndex = index;
 
-                    // Calcular tamanho
-                    const box = geometry.boundingBox;
-                    const size = new THREE.Vector3();
-                    box.getSize(size);
+                        // Posicionar na posicao original do STEP
+                        // (a geometria ja vem na posicao correta)
 
-                    console.log('Tamanho do modelo:', size);
+                        partMeshes[index] = mesh;
+                        modelGroup.add(mesh);
 
-                    // Material metalico bonito
-                    const material = new THREE.MeshStandardMaterial({
-                        color: 0x888899,
-                        metalness: 0.6,
-                        roughness: 0.4,
-                        flatShading: false
-                    });
+                        loadedCount++;
+                        const percent = 10 + (loadedCount / totalParts) * 85;
+                        updateLoading(percent, `Carregando: ${loadedCount}/${totalParts}`);
 
-                    // Criar mesh
-                    model = new THREE.Mesh(geometry, material);
-                    model.castShadow = true;
-                    model.receiveShadow = true;
-
-                    // Rotacionar para ficar em pe (STEP geralmente vem deitado)
-                    model.rotation.x = -Math.PI / 2;
-
-                    // Posicionar acima do grid
-                    const maxDim = Math.max(size.x, size.y, size.z);
-                    model.position.y = maxDim / 2;
-
-                    scene.add(model);
-
-                    // Estatisticas
-                    const vertexCount = geometry.attributes.position.count;
-                    const triangleCount = vertexCount / 3;
-
-                    document.getElementById('vertexCount').textContent = vertexCount.toLocaleString();
-                    document.getElementById('triangleCount').textContent = Math.round(triangleCount).toLocaleString();
-                    document.getElementById('objectCount').textContent = '1 (mesh unico)';
-
-                    // Ajustar camera
-                    camera.position.set(maxDim * 1.2, maxDim * 0.8, maxDim * 1.2);
-                    controls.target.set(0, maxDim / 3, 0);
-                    controls.minDistance = maxDim * 0.3;
-                    controls.maxDistance = maxDim * 4;
-
-                    finishLoading();
-                },
-                (progress) => {
-                    if (progress.total > 0) {
-                        const percent = (progress.loaded / progress.total) * 100;
-                        updateLoading(percent, `Baixando: ${(progress.loaded / 1024 / 1024).toFixed(1)} MB`);
+                        if (loadedCount === totalParts) {
+                            onAllPartsLoaded();
+                        }
+                    },
+                    undefined,
+                    (error) => {
+                        console.error(`Erro ao carregar ${part.file}:`, error);
+                        loadedCount++;
+                        if (loadedCount === totalParts) {
+                            onAllPartsLoaded();
+                        }
                     }
-                },
-                (error) => {
-                    console.error('Erro ao carregar modelo:', error);
-                    document.getElementById('loadingText').textContent = 'Erro ao carregar modelo!';
-                    document.getElementById('loadingText').style.color = '#ff4444';
+                );
+            });
+        }
+
+        function onAllPartsLoaded() {
+            console.log('Todas as pecas carregadas!');
+
+            // Centralizar o grupo
+            const box = new THREE.Box3().setFromObject(modelGroup);
+            const center = box.getCenter(new THREE.Vector3());
+            const size = box.getSize(new THREE.Vector3());
+
+            // Mover grupo para o centro
+            modelGroup.position.sub(center);
+            modelGroup.position.y += size.y / 2;
+
+            // Ajustar camera
+            const maxDim = Math.max(size.x, size.y, size.z);
+            camera.position.set(maxDim * 1.2, maxDim * 0.8, maxDim * 1.2);
+            controls.target.set(0, size.y / 3, 0);
+            controls.minDistance = maxDim * 0.3;
+            controls.maxDistance = maxDim * 4;
+
+            // Atualizar estatisticas
+            let totalVertices = 0;
+            let totalFaces = 0;
+            partMeshes.forEach(mesh => {
+                if (mesh && mesh.geometry) {
+                    totalVertices += mesh.geometry.attributes.position.count;
+                    totalFaces += mesh.geometry.attributes.position.count / 3;
                 }
-            );
+            });
+
+            document.getElementById('legendStats').innerHTML =
+                `<strong>${partMeshes.filter(m => m).length}</strong> pecas carregadas<br>` +
+                `<strong>${totalVertices.toLocaleString()}</strong> vertices<br>` +
+                `<strong>${Math.round(totalFaces).toLocaleString()}</strong> triangulos`;
+
+            finishLoading();
         }
 
         function updateLoading(percent, text) {
@@ -459,28 +576,30 @@
 
         function finishLoading() {
             document.getElementById('loadingScreen').style.display = 'none';
-            console.log('Modelo GLB carregado com sucesso!');
+            console.log('Modelo carregado com sucesso!');
         }
 
         // ============================================================================
         // FUNCOES DE CONTROLE
         // ============================================================================
         function resetCamera() {
-            if (model) {
-                const box = new THREE.Box3().setFromObject(model);
+            if (modelGroup) {
+                const box = new THREE.Box3().setFromObject(modelGroup);
                 const size = box.getSize(new THREE.Vector3());
                 const maxDim = Math.max(size.x, size.y, size.z);
 
                 camera.position.set(maxDim * 1.2, maxDim * 0.8, maxDim * 1.2);
-                controls.target.set(0, maxDim / 3, 0);
+                controls.target.set(0, size.y / 3, 0);
             }
         }
 
         function toggleWireframe() {
             isWireframe = !isWireframe;
-            if (model && model.material) {
-                model.material.wireframe = isWireframe;
-            }
+            partMeshes.forEach(mesh => {
+                if (mesh && mesh.material) {
+                    mesh.material.wireframe = isWireframe;
+                }
+            });
         }
 
         function toggleAutoRotate() {
@@ -494,7 +613,6 @@
         }
 
         function onDoubleClick(event) {
-            // Centralizar no ponto clicado
             const rect = renderer.domElement.getBoundingClientRect();
             const mouse = new THREE.Vector2(
                 ((event.clientX - rect.left) / rect.width) * 2 - 1,
@@ -504,10 +622,12 @@
             const raycaster = new THREE.Raycaster();
             raycaster.setFromCamera(mouse, camera);
 
-            if (model) {
-                const intersects = raycaster.intersectObject(model, true);
-                if (intersects.length > 0) {
-                    controls.target.copy(intersects[0].point);
+            const intersects = raycaster.intersectObjects(partMeshes.filter(m => m), true);
+            if (intersects.length > 0) {
+                controls.target.copy(intersects[0].point);
+                const clickedMesh = intersects[0].object;
+                if (clickedMesh.userData.partName) {
+                    console.log('Peca clicada:', clickedMesh.userData.partName);
                 }
             }
         }
