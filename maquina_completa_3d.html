@@ -406,6 +406,7 @@
         // (giram no proprio eixo, sem orbitar)
         const animatedParts = {
             29: { axis: 'x', speed: 0.0075 },  // Engrenagem Z2 - gira no proprio eixo X
+            62: { axis: 'z', speed: 0.01 },    // Rolamento 7 - gira em Z
         };
 
         // Grupos mecanicos - pecas que giram juntas em torno de um pivo comum
@@ -428,7 +429,6 @@
                     12,  // Placa Secundaria
                     13,  // Suporte Motor NEMA
                     14,  // Caixa Engrenagens
-                    15,  // Placa Motor (engrenagem fixa na caixa)
                     16,  // Coluna 1
                     17,  // Porca 1
                     18,  // Porca 2
@@ -436,6 +436,15 @@
                 ],
                 // Sub-grupos que giram dentro deste grupo
                 subGroups: {
+                    // Placa Motor - gira no proprio eixo (engrenagem)
+                    placaMotorGira: {
+                        pivot: [432.2, -240.46, 159.8],  // Centro da Placa Motor
+                        axis: 'z',  // Gira em Z (perpendicular a placa)
+                        speed: 0.01,
+                        parts: [
+                            15,  // Placa Motor
+                        ]
+                    },
                     // Mecanismo do dobrador - oscila ao redor da Coluna 1
                     mecanismoDobrador: {
                         pivot: [492.2, -240.43, 156.35],  // Centro da Coluna 1
