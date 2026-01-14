@@ -1,0 +1,534 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Wire Bending Machine 3D - Modelo Completo</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #1a1a1a;
+            color: #e0e0e0;
+            overflow: hidden;
+            height: 100vh;
+        }
+
+        #canvas3d {
+            width: 100%;
+            height: 100%;
+        }
+
+        .overlay {
+            position: absolute;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(26, 26, 26, 0.95);
+            padding: 15px 30px;
+            border-radius: 8px;
+            border: 2px solid #00ff88;
+            text-align: center;
+            z-index: 100;
+        }
+
+        .overlay h2 {
+            font-size: 18px;
+            color: #00ff88;
+            font-weight: 600;
+        }
+
+        .overlay p {
+            font-size: 11px;
+            color: #888;
+            margin-top: 5px;
+        }
+
+        .loading {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(26, 26, 26, 0.95);
+            padding: 40px 60px;
+            border-radius: 10px;
+            border: 2px solid #00ff88;
+            text-align: center;
+            z-index: 200;
+        }
+
+        .loading h3 {
+            color: #00ff88;
+            margin-bottom: 20px;
+            font-size: 18px;
+        }
+
+        .loading-bar {
+            width: 250px;
+            height: 8px;
+            background: #2a2a2a;
+            border-radius: 4px;
+            overflow: hidden;
+        }
+
+        .loading-progress {
+            height: 100%;
+            background: linear-gradient(90deg, #00ff88, #3a7bc8);
+            width: 0%;
+            transition: width 0.3s;
+        }
+
+        .loading-text {
+            margin-top: 15px;
+            font-size: 13px;
+            color: #888;
+        }
+
+        .controls {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            background: rgba(26, 26, 26, 0.95);
+            padding: 15px;
+            border-radius: 8px;
+            border: 1px solid #3a3a3a;
+            z-index: 100;
+        }
+
+        .controls h4 {
+            color: #00ff88;
+            margin-bottom: 10px;
+            font-size: 12px;
+        }
+
+        .controls p {
+            font-size: 11px;
+            color: #888;
+            margin: 4px 0;
+        }
+
+        .btn-group {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            z-index: 100;
+        }
+
+        .btn {
+            background: #00ff88;
+            color: #1a1a1a;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: 600;
+            transition: all 0.2s;
+        }
+
+        .btn:hover {
+            background: #00cc6a;
+            transform: translateY(-2px);
+        }
+
+        .btn-secondary {
+            background: #3a3a3a;
+            color: #e0e0e0;
+        }
+
+        .btn-secondary:hover {
+            background: #4a4a4a;
+        }
+
+        .info-panel {
+            position: absolute;
+            top: 100px;
+            right: 20px;
+            background: rgba(26, 26, 26, 0.95);
+            padding: 20px;
+            border-radius: 8px;
+            border: 1px solid #3a3a3a;
+            z-index: 100;
+            min-width: 220px;
+        }
+
+        .info-panel h4 {
+            color: #00ff88;
+            margin-bottom: 15px;
+            font-size: 14px;
+            border-bottom: 1px solid #3a3a3a;
+            padding-bottom: 10px;
+        }
+
+        .info-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 6px 0;
+            font-size: 12px;
+        }
+
+        .info-label {
+            color: #888;
+        }
+
+        .info-value {
+            color: #00ff88;
+            font-family: monospace;
+        }
+
+        .model-source {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(26, 26, 26, 0.9);
+            padding: 8px 20px;
+            border-radius: 20px;
+            font-size: 11px;
+            color: #666;
+            z-index: 100;
+        }
+
+        .model-source a {
+            color: #3a7bc8;
+            text-decoration: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="overlay">
+        <h2>Automatic 3D Wire Bending Machine</h2>
+        <p>Modelo Completo - HowToMechatronics / Thangs</p>
+    </div>
+
+    <div class="loading" id="loadingScreen">
+        <h3>Carregando Modelo 3D Completo</h3>
+        <div class="loading-bar">
+            <div class="loading-progress" id="loadingProgress"></div>
+        </div>
+        <div class="loading-text" id="loadingText">Iniciando...</div>
+    </div>
+
+    <div class="controls">
+        <h4>Controles da Camera</h4>
+        <p>Arrastar: Rotacionar</p>
+        <p>Scroll: Zoom</p>
+        <p>Shift + Arrastar: Mover</p>
+        <p>Duplo clique: Centralizar</p>
+    </div>
+
+    <div class="info-panel">
+        <h4>Informacoes do Modelo</h4>
+        <div class="info-row">
+            <span class="info-label">Formato:</span>
+            <span class="info-value">GLB (glTF Binary)</span>
+        </div>
+        <div class="info-row">
+            <span class="info-label">Tamanho:</span>
+            <span class="info-value">~4.9 MB</span>
+        </div>
+        <div class="info-row">
+            <span class="info-label">Vertices:</span>
+            <span class="info-value" id="vertexCount">-</span>
+        </div>
+        <div class="info-row">
+            <span class="info-label">Triangulos:</span>
+            <span class="info-value" id="triangleCount">-</span>
+        </div>
+        <div class="info-row">
+            <span class="info-label">Objetos:</span>
+            <span class="info-value" id="objectCount">-</span>
+        </div>
+    </div>
+
+    <div class="btn-group">
+        <button class="btn" onclick="resetCamera()">Resetar Camera</button>
+        <button class="btn btn-secondary" onclick="toggleWireframe()">Wireframe</button>
+        <button class="btn btn-secondary" onclick="toggleAutoRotate()">Auto Rotacao</button>
+        <button class="btn btn-secondary" onclick="cycleBackground()">Mudar Fundo</button>
+    </div>
+
+    <div class="model-source">
+        Modelo: <a href="https://thangs.com/m/44026" target="_blank">HowToMechatronics @ Thangs</a>
+    </div>
+
+    <div id="canvas3d"></div>
+
+    <!-- Three.js + STLLoader -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/STLLoader.js"></script>
+
+    <script>
+        // ============================================================================
+        // VARIAVEIS GLOBAIS
+        // ============================================================================
+        let scene, camera, renderer, controls;
+        let model = null;
+        let isWireframe = false;
+        let backgroundIndex = 0;
+        const backgrounds = [0x1a1a1a, 0x2a3a4a, 0x3a2a3a, 0x1a2a1a, 0x000000];
+
+        // ============================================================================
+        // INICIALIZACAO
+        // ============================================================================
+        function init() {
+            const container = document.getElementById('canvas3d');
+
+            // Cena
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(backgrounds[0]);
+
+            // Camera
+            camera = new THREE.PerspectiveCamera(
+                45,
+                window.innerWidth / window.innerHeight,
+                0.1,
+                10000
+            );
+            camera.position.set(300, 200, 400);
+
+            // Renderer
+            renderer = new THREE.WebGLRenderer({
+                antialias: true,
+                powerPreference: "high-performance"
+            });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+            renderer.shadowMap.enabled = true;
+            renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+            renderer.outputEncoding = THREE.sRGBEncoding;
+            renderer.toneMapping = THREE.ACESFilmicToneMapping;
+            renderer.toneMappingExposure = 1.2;
+            container.appendChild(renderer.domElement);
+
+            // Controles
+            controls = new THREE.OrbitControls(camera, renderer.domElement);
+            controls.enableDamping = true;
+            controls.dampingFactor = 0.05;
+            controls.screenSpacePanning = true;
+            controls.minDistance = 50;
+            controls.maxDistance = 2000;
+            controls.target.set(0, 50, 0);
+
+            // Luzes
+            setupLights();
+
+            // Grid
+            const grid = new THREE.GridHelper(500, 25, 0x444444, 0x333333);
+            grid.position.y = -10;
+            scene.add(grid);
+
+            // Carregar modelo GLB
+            loadGLBModel();
+
+            // Eventos
+            window.addEventListener('resize', onWindowResize);
+            renderer.domElement.addEventListener('dblclick', onDoubleClick);
+
+            // Loop
+            animate();
+        }
+
+        function setupLights() {
+            // Ambiente
+            const ambient = new THREE.AmbientLight(0xffffff, 0.5);
+            scene.add(ambient);
+
+            // Hemisphere (ceu/chao)
+            const hemi = new THREE.HemisphereLight(0xffffff, 0x444444, 0.6);
+            hemi.position.set(0, 200, 0);
+            scene.add(hemi);
+
+            // Principal
+            const main = new THREE.DirectionalLight(0xffffff, 0.8);
+            main.position.set(150, 300, 200);
+            main.castShadow = true;
+            main.shadow.mapSize.width = 2048;
+            main.shadow.mapSize.height = 2048;
+            main.shadow.camera.near = 10;
+            main.shadow.camera.far = 1000;
+            main.shadow.camera.left = -200;
+            main.shadow.camera.right = 200;
+            main.shadow.camera.top = 200;
+            main.shadow.camera.bottom = -200;
+            scene.add(main);
+
+            // Preenchimento
+            const fill = new THREE.DirectionalLight(0x88aaff, 0.3);
+            fill.position.set(-100, 100, -100);
+            scene.add(fill);
+
+            // Rim
+            const rim = new THREE.DirectionalLight(0xffffff, 0.2);
+            rim.position.set(0, 50, -200);
+            scene.add(rim);
+        }
+
+        // ============================================================================
+        // CARREGAMENTO DO MODELO STL (Maquina Completa)
+        // ============================================================================
+        function loadGLBModel() {
+            const loader = new THREE.STLLoader();
+
+            // Arquivo STL completo convertido do STEP
+            const stlFile = 'models/wire_bending_machine_complete.stl';
+
+            updateLoading(10, 'Iniciando download...');
+
+            loader.load(
+                stlFile,
+                (geometry) => {
+                    console.log('STL carregado!');
+
+                    // Centralizar geometria
+                    geometry.computeBoundingBox();
+                    geometry.center();
+
+                    // Calcular tamanho
+                    const box = geometry.boundingBox;
+                    const size = new THREE.Vector3();
+                    box.getSize(size);
+
+                    console.log('Tamanho do modelo:', size);
+
+                    // Material metalico bonito
+                    const material = new THREE.MeshStandardMaterial({
+                        color: 0x888899,
+                        metalness: 0.6,
+                        roughness: 0.4,
+                        flatShading: false
+                    });
+
+                    // Criar mesh
+                    model = new THREE.Mesh(geometry, material);
+                    model.castShadow = true;
+                    model.receiveShadow = true;
+
+                    // Rotacionar para ficar em pe (STEP geralmente vem deitado)
+                    model.rotation.x = -Math.PI / 2;
+
+                    // Posicionar acima do grid
+                    const maxDim = Math.max(size.x, size.y, size.z);
+                    model.position.y = maxDim / 2;
+
+                    scene.add(model);
+
+                    // Estatisticas
+                    const vertexCount = geometry.attributes.position.count;
+                    const triangleCount = vertexCount / 3;
+
+                    document.getElementById('vertexCount').textContent = vertexCount.toLocaleString();
+                    document.getElementById('triangleCount').textContent = Math.round(triangleCount).toLocaleString();
+                    document.getElementById('objectCount').textContent = '1 (mesh unico)';
+
+                    // Ajustar camera
+                    camera.position.set(maxDim * 1.2, maxDim * 0.8, maxDim * 1.2);
+                    controls.target.set(0, maxDim / 3, 0);
+                    controls.minDistance = maxDim * 0.3;
+                    controls.maxDistance = maxDim * 4;
+
+                    finishLoading();
+                },
+                (progress) => {
+                    if (progress.total > 0) {
+                        const percent = (progress.loaded / progress.total) * 100;
+                        updateLoading(percent, `Baixando: ${(progress.loaded / 1024 / 1024).toFixed(1)} MB`);
+                    }
+                },
+                (error) => {
+                    console.error('Erro ao carregar modelo:', error);
+                    document.getElementById('loadingText').textContent = 'Erro ao carregar modelo!';
+                    document.getElementById('loadingText').style.color = '#ff4444';
+                }
+            );
+        }
+
+        function updateLoading(percent, text) {
+            document.getElementById('loadingProgress').style.width = percent + '%';
+            document.getElementById('loadingText').textContent = text;
+        }
+
+        function finishLoading() {
+            document.getElementById('loadingScreen').style.display = 'none';
+            console.log('Modelo GLB carregado com sucesso!');
+        }
+
+        // ============================================================================
+        // FUNCOES DE CONTROLE
+        // ============================================================================
+        function resetCamera() {
+            if (model) {
+                const box = new THREE.Box3().setFromObject(model);
+                const size = box.getSize(new THREE.Vector3());
+                const maxDim = Math.max(size.x, size.y, size.z);
+
+                camera.position.set(maxDim * 1.2, maxDim * 0.8, maxDim * 1.2);
+                controls.target.set(0, maxDim / 3, 0);
+            }
+        }
+
+        function toggleWireframe() {
+            isWireframe = !isWireframe;
+            if (model && model.material) {
+                model.material.wireframe = isWireframe;
+            }
+        }
+
+        function toggleAutoRotate() {
+            controls.autoRotate = !controls.autoRotate;
+            controls.autoRotateSpeed = 2.0;
+        }
+
+        function cycleBackground() {
+            backgroundIndex = (backgroundIndex + 1) % backgrounds.length;
+            scene.background = new THREE.Color(backgrounds[backgroundIndex]);
+        }
+
+        function onDoubleClick(event) {
+            // Centralizar no ponto clicado
+            const rect = renderer.domElement.getBoundingClientRect();
+            const mouse = new THREE.Vector2(
+                ((event.clientX - rect.left) / rect.width) * 2 - 1,
+                -((event.clientY - rect.top) / rect.height) * 2 + 1
+            );
+
+            const raycaster = new THREE.Raycaster();
+            raycaster.setFromCamera(mouse, camera);
+
+            if (model) {
+                const intersects = raycaster.intersectObject(model, true);
+                if (intersects.length > 0) {
+                    controls.target.copy(intersects[0].point);
+                }
+            }
+        }
+
+        // ============================================================================
+        // LOOP E EVENTOS
+        // ============================================================================
+        function animate() {
+            requestAnimationFrame(animate);
+            controls.update();
+            renderer.render(scene, camera);
+        }
+
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        // Iniciar
+        init();
+    </script>
+</body>
+</html>

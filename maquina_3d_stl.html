@@ -113,15 +113,16 @@
 
         .part-list {
             position: absolute;
-            top: 80px;
+            top: 100px;
             right: 20px;
             background: rgba(26, 26, 26, 0.95);
             padding: 15px;
             border-radius: 8px;
             border: 1px solid #3a3a3a;
             z-index: 100;
-            max-height: 70vh;
+            max-height: 60vh;
             overflow-y: auto;
+            min-width: 200px;
         }
 
         .part-list h4 {
@@ -147,16 +148,24 @@
             height: 12px;
             border-radius: 3px;
             margin-right: 8px;
+            flex-shrink: 0;
         }
 
         .part-name {
             color: #ccc;
         }
 
-        .btn-reset {
+        .btn-group {
             position: absolute;
             bottom: 20px;
             right: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            z-index: 100;
+        }
+
+        .btn {
             background: #3a7bc8;
             color: white;
             border: none;
@@ -164,11 +173,43 @@
             border-radius: 6px;
             cursor: pointer;
             font-size: 12px;
-            z-index: 100;
+            transition: background 0.2s;
         }
 
-        .btn-reset:hover {
+        .btn:hover {
             background: #4a8bd8;
+        }
+
+        .btn-secondary {
+            background: #555;
+        }
+
+        .btn-secondary:hover {
+            background: #666;
+        }
+
+        .info-box {
+            position: absolute;
+            top: 100px;
+            left: 20px;
+            background: rgba(26, 26, 26, 0.95);
+            padding: 15px;
+            border-radius: 8px;
+            border: 1px solid #ff9500;
+            z-index: 100;
+            max-width: 280px;
+        }
+
+        .info-box h4 {
+            color: #ff9500;
+            margin-bottom: 8px;
+            font-size: 12px;
+        }
+
+        .info-box p {
+            font-size: 11px;
+            color: #aaa;
+            line-height: 1.5;
         }
     </style>
 </head>
@@ -186,6 +227,12 @@
         <div class="loading-text" id="loadingText">Iniciando...</div>
     </div>
 
+    <div class="info-box">
+        <h4>Nota sobre a Montagem</h4>
+        <p>Os arquivos STL contem apenas as pecas impressas em 3D. A estrutura de MDF/compensado e os motores nao estao incluidos nos arquivos disponiveis.</p>
+        <p style="margin-top: 8px;">Para o modelo completo montado, baixe o arquivo STEP do <a href="https://thangs.com/m/44026" target="_blank" style="color: #3a7bc8;">Thangs</a>.</p>
+    </div>
+
     <div class="controls">
         <h4>Controles da Camera</h4>
         <p>Botao esquerdo: Rotacionar</p>
@@ -194,11 +241,14 @@
     </div>
 
     <div class="part-list" id="partList">
-        <h4>Componentes Carregados</h4>
-        <!-- Populated by JS -->
+        <h4>Componentes</h4>
     </div>
 
-    <button class="btn-reset" onclick="resetCamera()">Resetar Camera</button>
+    <div class="btn-group">
+        <button class="btn" onclick="resetCamera()">Resetar Camera</button>
+        <button class="btn btn-secondary" onclick="toggleWireframe()">Wireframe</button>
+        <button class="btn btn-secondary" onclick="explodeView()">Explodir Vista</button>
+    </div>
 
     <div id="canvas3d"></div>
 
@@ -214,104 +264,149 @@
         let scene, camera, renderer, controls;
         let loadedParts = [];
         let loadingComplete = false;
+        let isWireframe = false;
+        let isExploded = false;
 
-        // Definicao das pecas com cores e posicoes aproximadas
+        // Estrutura da maquina baseada no tutorial HowToMechatronics:
+        // - Base: MDF 8mm + compensado 18mm (nao incluido nos STLs)
+        // - Eixo Z: tubo oco 15mm com rolamentos 6202
+        // - Alimentador: no topo, empurra o arame
+        // - Cabecote de dobra: conectado ao eixo Z
+        // - Motores: NEMA 17 (eixo Z e alimentador) + NEMA 23 (dobra) + Servo MG996R
+
         const PARTS = [
+            // === ALIMENTADOR (TOPO) ===
             {
                 file: 'Feeder.STL',
                 name: 'Alimentador',
                 color: 0x4a90d9,
-                position: { x: -80, y: 0, z: 0 },
-                rotation: { x: 0, y: 0, z: 0 },
-                scale: 1
+                position: { x: 0, y: 120, z: 0 },
+                rotation: { x: -Math.PI/2, y: 0, z: 0 },
+                scale: 1,
+                explodeOffset: { x: 0, y: 80, z: 0 }
             },
             {
                 file: 'Straightener roller.STL',
                 name: 'Rolo Endireitador',
-                color: 0x666666,
-                position: { x: -120, y: 0, z: 0 },
-                rotation: { x: Math.PI/2, y: 0, z: 0 },
-                scale: 1
+                color: 0x888888,
+                position: { x: -60, y: 120, z: 0 },
+                rotation: { x: 0, y: 0, z: Math.PI/2 },
+                scale: 1,
+                explodeOffset: { x: -60, y: 80, z: 0 }
+            },
+
+            // === EIXO Z (CENTRAL) ===
+            {
+                file: 'Z-axis gear 1.STL',
+                name: 'Engrenagem Z 1 (30 dentes)',
+                color: 0x3d7cbf,
+                position: { x: 0, y: 60, z: 0 },
+                rotation: { x: -Math.PI/2, y: 0, z: 0 },
+                scale: 1,
+                explodeOffset: { x: 0, y: 40, z: 0 }
             },
             {
+                file: 'Z-axis gear 2.STL',
+                name: 'Engrenagem Z 2 (18 dentes)',
+                color: 0x5588cc,
+                position: { x: 40, y: 60, z: 0 },
+                rotation: { x: -Math.PI/2, y: 0, z: 0 },
+                scale: 1,
+                explodeOffset: { x: 60, y: 40, z: 0 }
+            },
+            {
+                file: 'Pillow block.STL',
+                name: 'Mancal Superior',
+                color: 0x3a6090,
+                position: { x: 0, y: 80, z: 0 },
+                rotation: { x: -Math.PI/2, y: 0, z: 0 },
+                scale: 1,
+                explodeOffset: { x: 0, y: 60, z: 0 }
+            },
+            {
+                file: 'Pillow block.STL',
+                name: 'Mancal Inferior',
+                color: 0x3a6090,
+                position: { x: 0, y: 40, z: 0 },
+                rotation: { x: -Math.PI/2, y: 0, z: 0 },
+                scale: 1,
+                explodeOffset: { x: 0, y: 20, z: 0 }
+            },
+
+            // === CABECOTE DE DOBRA ===
+            {
                 file: 'Bender gear 1.STL',
-                name: 'Engrenagem Dobrador 1',
-                color: 0x3d7cbf,
-                position: { x: 50, y: 0, z: 0 },
-                rotation: { x: Math.PI/2, y: 0, z: 0 },
-                scale: 1
+                name: 'Engrenagem Dobra (30 dentes)',
+                color: 0x2d6caf,
+                position: { x: 0, y: 0, z: 0 },
+                rotation: { x: -Math.PI/2, y: 0, z: 0 },
+                scale: 1,
+                explodeOffset: { x: 0, y: -20, z: 0 }
             },
             {
                 file: 'bender gear modified.STL',
-                name: 'Engrenagem Modificada',
-                color: 0x2d6caf,
-                position: { x: 50, y: 30, z: 0 },
-                rotation: { x: Math.PI/2, y: 0, z: 0 },
-                scale: 1
+                name: 'Engrenagem Motor Dobra',
+                color: 0x4478bc,
+                position: { x: 50, y: 0, z: 0 },
+                rotation: { x: -Math.PI/2, y: 0, z: 0 },
+                scale: 1,
+                explodeOffset: { x: 80, y: -20, z: 0 }
             },
             {
                 file: 'Bender nozzle.STL',
                 name: 'Bico Dobrador',
                 color: 0xff6600,
-                position: { x: 80, y: 0, z: 0 },
+                position: { x: 0, y: -10, z: 30 },
                 rotation: { x: 0, y: 0, z: 0 },
-                scale: 1
+                scale: 1,
+                explodeOffset: { x: 0, y: -40, z: 50 }
             },
             {
                 file: 'rack pin.STL',
                 name: 'Pino Cremalheira',
                 color: 0xcc4400,
-                position: { x: 100, y: 0, z: 0 },
-                rotation: { x: 0, y: 0, z: 0 },
-                scale: 1
-            },
-            {
-                file: 'Z-axis gear 1.STL',
-                name: 'Engrenagem Eixo Z 1',
-                color: 0x5588cc,
-                position: { x: 0, y: 50, z: 0 },
-                rotation: { x: 0, y: 0, z: 0 },
-                scale: 1
-            },
-            {
-                file: 'Z-axis gear 2.STL',
-                name: 'Engrenagem Eixo Z 2',
-                color: 0x4478bc,
-                position: { x: 0, y: 80, z: 0 },
-                rotation: { x: 0, y: 0, z: 0 },
-                scale: 1
+                position: { x: 0, y: -10, z: 50 },
+                rotation: { x: Math.PI/2, y: 0, z: 0 },
+                scale: 1,
+                explodeOffset: { x: 0, y: -40, z: 80 }
             },
             {
                 file: 'Servo - pinion gear.STL',
                 name: 'Pinhao Servo',
-                color: 0x888888,
-                position: { x: 120, y: 20, z: 0 },
+                color: 0x666666,
+                position: { x: 30, y: -10, z: 40 },
                 rotation: { x: 0, y: 0, z: 0 },
-                scale: 1
+                scale: 1,
+                explodeOffset: { x: 50, y: -40, z: 60 }
             },
+
+            // === SUPORTES ===
             {
-                file: 'Nema 17 mount.STL',
-                name: 'Suporte NEMA 17',
-                color: 0x333333,
-                position: { x: -50, y: -30, z: 0 },
+                file: 'Shaft clamp.STL',
+                name: 'Bracadeira Eixo 1',
+                color: 0x4a7ab0,
+                position: { x: 0, y: 20, z: 25 },
                 rotation: { x: 0, y: 0, z: 0 },
-                scale: 1
-            },
-            {
-                file: 'Pillow block.STL',
-                name: 'Mancal',
-                color: 0x3a6090,
-                position: { x: -30, y: 0, z: 30 },
-                rotation: { x: 0, y: 0, z: 0 },
-                scale: 1
+                scale: 1,
+                explodeOffset: { x: 0, y: 0, z: 50 }
             },
             {
                 file: 'Shaft clamp.STL',
-                name: 'Bracadeira Eixo',
+                name: 'Bracadeira Eixo 2',
                 color: 0x4a7ab0,
-                position: { x: 0, y: 0, z: -30 },
-                rotation: { x: 0, y: 0, z: 0 },
-                scale: 1
+                position: { x: 0, y: 20, z: -25 },
+                rotation: { x: 0, y: Math.PI, z: 0 },
+                scale: 1,
+                explodeOffset: { x: 0, y: 0, z: -50 }
+            },
+            {
+                file: 'Nema 17 mount.STL',
+                name: 'Suporte Motor NEMA 17',
+                color: 0x333333,
+                position: { x: 60, y: 60, z: 0 },
+                rotation: { x: -Math.PI/2, y: 0, z: 0 },
+                scale: 1,
+                explodeOffset: { x: 100, y: 40, z: 0 }
             }
         ];
 
@@ -332,7 +427,7 @@
                 0.1,
                 5000
             );
-            camera.position.set(200, 150, 300);
+            camera.position.set(200, 150, 250);
 
             // Renderer
             renderer = new THREE.WebGLRenderer({ antialias: true });
@@ -345,13 +440,19 @@
             controls = new THREE.OrbitControls(camera, renderer.domElement);
             controls.enableDamping = true;
             controls.dampingFactor = 0.05;
-            controls.target.set(0, 20, 0);
+            controls.target.set(0, 50, 0);
 
             // Luzes
             setupLights();
 
-            // Grid e chao
+            // Ambiente
             createEnvironment();
+
+            // Criar estrutura base (MDF simulado)
+            createBaseStructure();
+
+            // Criar tubo central (eixo Z)
+            createZAxisTube();
 
             // Carregar STLs
             loadAllSTLs();
@@ -364,37 +465,108 @@
         }
 
         function setupLights() {
-            // Ambiente
             const ambient = new THREE.AmbientLight(0xffffff, 0.5);
             scene.add(ambient);
 
-            // Principal
             const main = new THREE.DirectionalLight(0xffffff, 0.8);
             main.position.set(200, 300, 200);
             main.castShadow = true;
             scene.add(main);
 
-            // Preenchimento
             const fill = new THREE.DirectionalLight(0x4488ff, 0.3);
             fill.position.set(-100, 100, -100);
             scene.add(fill);
 
-            // Rim light
-            const rim = new THREE.DirectionalLight(0xffffff, 0.2);
-            rim.position.set(0, -100, -200);
-            scene.add(rim);
+            const back = new THREE.DirectionalLight(0xffffff, 0.2);
+            back.position.set(0, 100, -200);
+            scene.add(back);
         }
 
         function createEnvironment() {
             // Grid
-            const grid = new THREE.GridHelper(500, 25, 0x444444, 0x333333);
-            grid.position.y = -50;
+            const grid = new THREE.GridHelper(400, 20, 0x444444, 0x333333);
+            grid.position.y = -60;
             scene.add(grid);
 
-            // Eixos (pequenos, para referencia)
-            const axes = new THREE.AxesHelper(50);
-            axes.position.y = -49;
+            // Eixos
+            const axes = new THREE.AxesHelper(30);
+            axes.position.y = -59;
             scene.add(axes);
+        }
+
+        function createBaseStructure() {
+            // Base de MDF/compensado (representacao simplificada)
+            const baseMat = new THREE.MeshStandardMaterial({
+                color: 0x8B4513,  // Marrom madeira
+                roughness: 0.8
+            });
+
+            // Placa superior
+            const topPlate = new THREE.Mesh(
+                new THREE.BoxGeometry(150, 8, 120),
+                baseMat
+            );
+            topPlate.position.set(0, 100, 0);
+            topPlate.castShadow = true;
+            topPlate.receiveShadow = true;
+            scene.add(topPlate);
+
+            // Placa inferior
+            const bottomPlate = new THREE.Mesh(
+                new THREE.BoxGeometry(150, 8, 120),
+                baseMat
+            );
+            bottomPlate.position.set(0, -50, 0);
+            bottomPlate.castShadow = true;
+            bottomPlate.receiveShadow = true;
+            scene.add(bottomPlate);
+
+            // Colunas
+            const columnMat = new THREE.MeshStandardMaterial({
+                color: 0x9B5523,
+                roughness: 0.7
+            });
+
+            const positions = [
+                { x: -60, z: -45 },
+                { x: -60, z: 45 },
+                { x: 60, z: -45 },
+                { x: 60, z: 45 }
+            ];
+
+            positions.forEach(pos => {
+                const column = new THREE.Mesh(
+                    new THREE.BoxGeometry(18, 150, 18),
+                    columnMat
+                );
+                column.position.set(pos.x, 25, pos.z);
+                column.castShadow = true;
+                scene.add(column);
+            });
+        }
+
+        function createZAxisTube() {
+            // Tubo oco de 15mm (eixo Z principal)
+            const tubeMat = new THREE.MeshStandardMaterial({
+                color: 0xB87333,  // Cobre
+                metalness: 0.8,
+                roughness: 0.3
+            });
+
+            // Tubo externo
+            const tubeGeo = new THREE.CylinderGeometry(7.5, 7.5, 180, 32);
+            const tube = new THREE.Mesh(tubeGeo, tubeMat);
+            tube.position.set(0, 25, 0);
+            scene.add(tube);
+
+            // Furo interno (mais escuro)
+            const holeMat = new THREE.MeshStandardMaterial({
+                color: 0x333333
+            });
+            const holeGeo = new THREE.CylinderGeometry(5, 5, 182, 32);
+            const hole = new THREE.Mesh(holeGeo, holeMat);
+            hole.position.set(0, 25, 0);
+            scene.add(hole);
         }
 
         // ============================================================================
@@ -407,51 +579,46 @@
 
             PARTS.forEach((part, index) => {
                 const filePath = 'models/' + part.file;
-
                 updateLoading(loaded, total, 'Carregando: ' + part.name);
 
                 loader.load(
                     filePath,
                     (geometry) => {
-                        // Criar material
+                        // Centralizar geometria
+                        geometry.computeBoundingBox();
+                        const center = new THREE.Vector3();
+                        geometry.boundingBox.getCenter(center);
+                        geometry.translate(-center.x, -center.y, -center.z);
+
                         const material = new THREE.MeshStandardMaterial({
                             color: part.color,
                             metalness: 0.3,
-                            roughness: 0.6,
-                            flatShading: false
+                            roughness: 0.6
                         });
 
-                        // Criar mesh
                         const mesh = new THREE.Mesh(geometry, material);
-
-                        // Aplicar transformacoes
                         mesh.position.set(part.position.x, part.position.y, part.position.z);
                         mesh.rotation.set(part.rotation.x, part.rotation.y, part.rotation.z);
                         mesh.scale.setScalar(part.scale);
-
-                        // Sombras
                         mesh.castShadow = true;
                         mesh.receiveShadow = true;
 
-                        // Adicionar a cena
-                        scene.add(mesh);
-                        loadedParts.push({ mesh, part });
+                        // Guardar posicao original para explode view
+                        mesh.userData.originalPosition = { ...part.position };
+                        mesh.userData.explodeOffset = part.explodeOffset;
 
-                        // Atualizar progresso
+                        scene.add(mesh);
+                        loadedParts.push({ mesh, part, material });
+
                         loaded++;
                         updateLoading(loaded, total, 'Carregado: ' + part.name);
-
-                        // Adicionar a lista de pecas
                         addPartToList(part);
 
-                        // Verificar se terminou
                         if (loaded === total) {
                             finishLoading();
                         }
                     },
-                    (progress) => {
-                        // Progress callback
-                    },
+                    undefined,
                     (error) => {
                         console.error('Erro ao carregar ' + part.file + ':', error);
                         loaded++;
@@ -472,11 +639,7 @@
         function finishLoading() {
             loadingComplete = true;
             document.getElementById('loadingScreen').style.display = 'none';
-
-            // Centralizar camera nas pecas carregadas
-            centerCameraOnParts();
-
-            console.log('Todos os modelos carregados!');
+            console.log('Modelo carregado!');
         }
 
         function addPartToList(part) {
@@ -490,32 +653,38 @@
             list.appendChild(item);
         }
 
-        function centerCameraOnParts() {
-            if (loadedParts.length === 0) return;
-
-            // Calcular bounding box de todas as pecas
-            const box = new THREE.Box3();
-            loadedParts.forEach(({ mesh }) => {
-                box.expandByObject(mesh);
-            });
-
-            const center = box.getCenter(new THREE.Vector3());
-            const size = box.getSize(new THREE.Vector3());
-
-            // Ajustar target dos controles
-            controls.target.copy(center);
-
-            // Ajustar posicao da camera
-            const maxDim = Math.max(size.x, size.y, size.z);
-            camera.position.set(
-                center.x + maxDim * 1.5,
-                center.y + maxDim,
-                center.z + maxDim * 1.5
-            );
+        // ============================================================================
+        // FUNCOES DE VISUALIZACAO
+        // ============================================================================
+        function resetCamera() {
+            camera.position.set(200, 150, 250);
+            controls.target.set(0, 50, 0);
         }
 
-        function resetCamera() {
-            centerCameraOnParts();
+        function toggleWireframe() {
+            isWireframe = !isWireframe;
+            loadedParts.forEach(({ material }) => {
+                material.wireframe = isWireframe;
+            });
+        }
+
+        function explodeView() {
+            isExploded = !isExploded;
+
+            loadedParts.forEach(({ mesh }) => {
+                const orig = mesh.userData.originalPosition;
+                const offset = mesh.userData.explodeOffset;
+
+                if (isExploded) {
+                    mesh.position.set(
+                        orig.x + offset.x,
+                        orig.y + offset.y,
+                        orig.z + offset.z
+                    );
+                } else {
+                    mesh.position.set(orig.x, orig.y, orig.z);
+                }
+            });
         }
 
         // ============================================================================
