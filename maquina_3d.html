@@ -1,0 +1,816 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Estribadeira 3D - Simulacao Completa</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #1a1a1a;
+            color: #e0e0e0;
+            overflow: hidden;
+            height: 100vh;
+        }
+
+        .container {
+            display: flex;
+            height: 100vh;
+        }
+
+        .canvas-area {
+            flex: 1;
+            position: relative;
+        }
+
+        #canvas3d {
+            width: 100%;
+            height: 100%;
+        }
+
+        .title-overlay {
+            position: absolute;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(26, 26, 26, 0.9);
+            padding: 15px 30px;
+            border-radius: 8px;
+            border: 2px solid #3a7bc8;
+            text-align: center;
+            z-index: 100;
+        }
+
+        .title-overlay h2 {
+            font-size: 18px;
+            color: #3a7bc8;
+            font-weight: 600;
+        }
+
+        .instructions {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            background: rgba(0, 0, 0, 0.8);
+            padding: 15px;
+            border-radius: 8px;
+            font-size: 12px;
+            color: #888;
+            z-index: 100;
+        }
+
+        .instructions h4 {
+            color: #3a7bc8;
+            margin-bottom: 8px;
+        }
+
+        /* Painel de Controle */
+        .control-panel {
+            width: 350px;
+            background: linear-gradient(180deg, #252525 0%, #1a1a1a 100%);
+            border-left: 3px solid #3a7bc8;
+            padding: 25px;
+            overflow-y: auto;
+        }
+
+        .panel-header {
+            text-align: center;
+            margin-bottom: 25px;
+            padding-bottom: 15px;
+            border-bottom: 2px solid #3a7bc8;
+        }
+
+        .panel-header h1 {
+            font-size: 18px;
+            color: #3a7bc8;
+            font-weight: 600;
+        }
+
+        .section-title {
+            font-size: 12px;
+            color: #3a7bc8;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin: 20px 0 12px 0;
+            font-weight: 600;
+        }
+
+        /* Displays */
+        .display {
+            background: #0d0d0d;
+            border: 2px solid #2a2a2a;
+            border-radius: 6px;
+            padding: 12px;
+            margin-bottom: 12px;
+        }
+
+        .display-label {
+            font-size: 10px;
+            color: #888;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 5px;
+        }
+
+        .display-value {
+            font-size: 24px;
+            font-weight: 700;
+            color: #00ff88;
+            font-family: 'Courier New', monospace;
+        }
+
+        .display-value.status {
+            font-size: 14px;
+            color: #3a7bc8;
+        }
+
+        .display-value.running {
+            color: #ff9500;
+            animation: pulse 1s ease-in-out infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        /* Botoes */
+        .btn {
+            width: 100%;
+            padding: 14px;
+            margin-bottom: 10px;
+            border: none;
+            border-radius: 6px;
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            text-transform: uppercase;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #3a7bc8 0%, #2a5a9a 100%);
+            color: white;
+        }
+
+        .btn-primary:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(58, 123, 200, 0.5);
+        }
+
+        .btn-primary:disabled {
+            background: #3a3a3a;
+            cursor: not-allowed;
+        }
+
+        .btn-stop {
+            background: linear-gradient(135deg, #d32f2f 0%, #a82020 100%);
+            color: white;
+        }
+
+        .btn-stop:hover {
+            box-shadow: 0 4px 15px rgba(211, 47, 47, 0.5);
+        }
+
+        /* Contador */
+        .counter {
+            background: #0d0d0d;
+            border: 2px solid #2a2a2a;
+            border-radius: 6px;
+            padding: 20px;
+            text-align: center;
+            margin-top: 20px;
+        }
+
+        .counter-value {
+            font-size: 42px;
+            font-weight: 700;
+            color: #00ff88;
+            font-family: 'Courier New', monospace;
+        }
+
+        /* Velocidade */
+        .speed-control {
+            margin: 15px 0;
+        }
+
+        .speed-control input[type="range"] {
+            width: 100%;
+            margin-top: 8px;
+        }
+
+        .speed-label {
+            display: flex;
+            justify-content: space-between;
+            font-size: 11px;
+            color: #888;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="canvas-area">
+            <div class="title-overlay">
+                <h2>Estribadeira Automatica 3D</h2>
+            </div>
+            <div id="canvas3d"></div>
+            <div class="instructions">
+                <h4>Controles da Camera</h4>
+                <p>Arrastar: Rotacionar</p>
+                <p>Scroll: Zoom</p>
+                <p>Shift+Arrastar: Mover</p>
+            </div>
+        </div>
+
+        <div class="control-panel">
+            <div class="panel-header">
+                <h1>PAINEL DE CONTROLE</h1>
+            </div>
+
+            <div class="display">
+                <div class="display-label">Status</div>
+                <div class="display-value status" id="statusDisplay">AGUARDANDO</div>
+            </div>
+
+            <div class="display">
+                <div class="display-label">Angulo Encoder</div>
+                <div class="display-value" id="angleDisplay">0.0</div>
+            </div>
+
+            <div class="display">
+                <div class="display-label">Avanco (mm)</div>
+                <div class="display-value" id="feedDisplay">0</div>
+            </div>
+
+            <div class="section-title">Programas</div>
+            <button class="btn btn-primary" id="btnSquare">Estribo Quadrado</button>
+            <button class="btn btn-primary" id="btnRect">Estribo Retangular</button>
+            <button class="btn btn-primary" id="btnTriangle">Estribo Triangular</button>
+            <button class="btn btn-stop" id="btnStop">PARADA EMERGENCIA</button>
+
+            <div class="section-title">Velocidade</div>
+            <div class="speed-control">
+                <div class="speed-label">
+                    <span>Lento</span>
+                    <span id="speedValue">1.0x</span>
+                    <span>Rapido</span>
+                </div>
+                <input type="range" id="speedSlider" min="0.2" max="3" step="0.1" value="1">
+            </div>
+
+            <div class="counter">
+                <div class="display-label">Pecas Produzidas</div>
+                <div class="counter-value" id="productionCounter">0</div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+
+    <script>
+        // ============================================================================
+        // CONFIGURACAO THREE.JS
+        // ============================================================================
+        let scene, camera, renderer, controls;
+        let machine = {};  // Partes da maquina
+        let wirePoints = [];
+        let wireMesh = null;
+        let isRunning = false;
+        let animationSpeed = 1.0;
+        let productionCount = 0;
+
+        // Estado da simulacao
+        let currentProgram = null;
+        let operationQueue = [];
+        let currentOp = null;
+        let opProgress = 0;
+
+        // Angulos e posicoes
+        let feedPosition = 0;
+        let bendAngle = 0;
+        let rollerRotation = 0;
+
+        // Cores
+        const COLORS = {
+            machineBase: 0x2a4a75,
+            machineDark: 0x1a3050,
+            machineAccent: 0x4a6fa5,
+            roller: 0x5a5a5a,
+            bendPin: 0xff6600,
+            fixedPin: 0xcc0000,
+            wire: 0xd0d0d0,
+            floor: 0x1a1a1a
+        };
+
+        // Programas
+        const PROGRAMS = {
+            square: {
+                name: 'Quadrado',
+                steps: [
+                    { type: 'feed', value: 50 },
+                    { type: 'bend', value: 90 },
+                    { type: 'feed', value: 200 },
+                    { type: 'bend', value: 90 },
+                    { type: 'feed', value: 200 },
+                    { type: 'bend', value: 90 },
+                    { type: 'feed', value: 200 },
+                    { type: 'bend', value: 90 },
+                    { type: 'feed', value: 150 },
+                    { type: 'cut' }
+                ]
+            },
+            rectangle: {
+                name: 'Retangular',
+                steps: [
+                    { type: 'feed', value: 50 },
+                    { type: 'bend', value: 90 },
+                    { type: 'feed', value: 150 },
+                    { type: 'bend', value: 90 },
+                    { type: 'feed', value: 300 },
+                    { type: 'bend', value: 90 },
+                    { type: 'feed', value: 150 },
+                    { type: 'bend', value: 90 },
+                    { type: 'feed', value: 250 },
+                    { type: 'cut' }
+                ]
+            },
+            triangle: {
+                name: 'Triangular',
+                steps: [
+                    { type: 'feed', value: 50 },
+                    { type: 'bend', value: 120 },
+                    { type: 'feed', value: 250 },
+                    { type: 'bend', value: 120 },
+                    { type: 'feed', value: 250 },
+                    { type: 'bend', value: 120 },
+                    { type: 'feed', value: 200 },
+                    { type: 'cut' }
+                ]
+            }
+        };
+
+        // ============================================================================
+        // INICIALIZACAO
+        // ============================================================================
+        function init() {
+            const container = document.getElementById('canvas3d');
+
+            // Cena
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x1a1a1a);
+
+            // Camera
+            camera = new THREE.PerspectiveCamera(50, container.clientWidth / container.clientHeight, 1, 5000);
+            camera.position.set(400, 350, 600);
+
+            // Renderer
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(container.clientWidth, container.clientHeight);
+            renderer.setPixelRatio(window.devicePixelRatio);
+            renderer.shadowMap.enabled = true;
+            renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+            container.appendChild(renderer.domElement);
+
+            // Controles
+            controls = new THREE.OrbitControls(camera, renderer.domElement);
+            controls.enableDamping = true;
+            controls.dampingFactor = 0.05;
+            controls.target.set(100, 50, 0);
+
+            // Luzes
+            setupLights();
+
+            // Chao
+            createFloor();
+
+            // Maquina
+            createMachine();
+
+            // Arame inicial
+            resetWire();
+
+            // Eventos
+            window.addEventListener('resize', onWindowResize);
+            setupUI();
+
+            // Iniciar loop
+            animate();
+        }
+
+        function setupLights() {
+            // Luz ambiente
+            const ambient = new THREE.AmbientLight(0xffffff, 0.4);
+            scene.add(ambient);
+
+            // Luz principal
+            const mainLight = new THREE.DirectionalLight(0xffffff, 0.8);
+            mainLight.position.set(300, 500, 400);
+            mainLight.castShadow = true;
+            mainLight.shadow.mapSize.width = 2048;
+            mainLight.shadow.mapSize.height = 2048;
+            mainLight.shadow.camera.near = 100;
+            mainLight.shadow.camera.far = 1500;
+            mainLight.shadow.camera.left = -500;
+            mainLight.shadow.camera.right = 500;
+            mainLight.shadow.camera.top = 500;
+            mainLight.shadow.camera.bottom = -500;
+            scene.add(mainLight);
+
+            // Luz de preenchimento
+            const fillLight = new THREE.DirectionalLight(0x4488ff, 0.3);
+            fillLight.position.set(-200, 200, -200);
+            scene.add(fillLight);
+        }
+
+        function createFloor() {
+            const floorGeo = new THREE.PlaneGeometry(2000, 2000);
+            const floorMat = new THREE.MeshStandardMaterial({
+                color: COLORS.floor,
+                roughness: 0.9
+            });
+            const floor = new THREE.Mesh(floorGeo, floorMat);
+            floor.rotation.x = -Math.PI / 2;
+            floor.position.y = -5;
+            floor.receiveShadow = true;
+            scene.add(floor);
+
+            // Grid
+            const grid = new THREE.GridHelper(2000, 40, 0x333333, 0x222222);
+            grid.position.y = -4;
+            scene.add(grid);
+        }
+
+        // ============================================================================
+        // CRIACAO DA MAQUINA
+        // ============================================================================
+        function createMachine() {
+            // Base principal
+            const baseMat = new THREE.MeshStandardMaterial({ color: COLORS.machineBase, roughness: 0.6 });
+            const darkMat = new THREE.MeshStandardMaterial({ color: COLORS.machineDark, roughness: 0.7 });
+            const accentMat = new THREE.MeshStandardMaterial({ color: COLORS.machineAccent, roughness: 0.5 });
+            const rollerMat = new THREE.MeshStandardMaterial({ color: COLORS.roller, metalness: 0.3, roughness: 0.6 });
+            const pinMat = new THREE.MeshStandardMaterial({ color: COLORS.bendPin, metalness: 0.5, roughness: 0.4 });
+            const fixedMat = new THREE.MeshStandardMaterial({ color: COLORS.fixedPin, metalness: 0.5, roughness: 0.4 });
+
+            // ==================== ALIMENTADOR ====================
+            const feederGroup = new THREE.Group();
+            feederGroup.position.set(-150, 50, 0);
+
+            // Corpo do alimentador
+            const feederBody = new THREE.Mesh(
+                new THREE.BoxGeometry(100, 120, 80),
+                baseMat
+            );
+            feederBody.castShadow = true;
+            feederGroup.add(feederBody);
+
+            // Rolo superior
+            const rollerGeo = new THREE.CylinderGeometry(25, 25, 60, 32);
+            machine.rollerTop = new THREE.Mesh(rollerGeo, rollerMat);
+            machine.rollerTop.rotation.x = Math.PI / 2;
+            machine.rollerTop.position.set(0, 30, 0);
+            machine.rollerTop.castShadow = true;
+            feederGroup.add(machine.rollerTop);
+
+            // Rolo inferior
+            machine.rollerBottom = new THREE.Mesh(rollerGeo, rollerMat);
+            machine.rollerBottom.rotation.x = Math.PI / 2;
+            machine.rollerBottom.position.set(0, -30, 0);
+            machine.rollerBottom.castShadow = true;
+            feederGroup.add(machine.rollerBottom);
+
+            // Linhas nos rolos para visualizar rotacao
+            addRollerLines(machine.rollerTop);
+            addRollerLines(machine.rollerBottom);
+
+            // Guia de entrada do fio
+            const guideGeo = new THREE.CylinderGeometry(8, 8, 80, 16);
+            const guide = new THREE.Mesh(guideGeo, darkMat);
+            guide.rotation.z = Math.PI / 2;
+            guide.position.set(-90, 0, 0);
+            feederGroup.add(guide);
+
+            scene.add(feederGroup);
+            machine.feeder = feederGroup;
+
+            // ==================== CABEÇOTE DE DOBRA ====================
+            const bendHead = new THREE.Group();
+            bendHead.position.set(100, 50, 0);
+
+            // Disco base
+            const discGeo = new THREE.CylinderGeometry(80, 80, 30, 64);
+            const disc = new THREE.Mesh(discGeo, accentMat);
+            disc.rotation.x = Math.PI / 2;
+            disc.castShadow = true;
+            bendHead.add(disc);
+
+            // Disco interno (rotativo)
+            const innerDiscGeo = new THREE.CylinderGeometry(60, 60, 35, 64);
+            machine.rotatingDisc = new THREE.Mesh(innerDiscGeo, darkMat);
+            machine.rotatingDisc.rotation.x = Math.PI / 2;
+            machine.rotatingDisc.castShadow = true;
+            bendHead.add(machine.rotatingDisc);
+
+            // Pino fixo (guia) - vermelho
+            const pinGeo = new THREE.CylinderGeometry(10, 10, 50, 16);
+            const fixedPin = new THREE.Mesh(pinGeo, fixedMat);
+            fixedPin.rotation.x = Math.PI / 2;
+            fixedPin.position.set(55, 0, 25);
+            fixedPin.castShadow = true;
+            bendHead.add(fixedPin);
+
+            // Pino movel (dobrador) - laranja
+            machine.bendPin = new THREE.Mesh(pinGeo, pinMat);
+            machine.bendPin.rotation.x = Math.PI / 2;
+            machine.bendPin.position.set(-55, 0, 25);
+            machine.bendPin.castShadow = true;
+            bendHead.add(machine.bendPin);
+
+            // Marcador de angulo no disco
+            const markerGeo = new THREE.BoxGeometry(50, 5, 5);
+            machine.angleMarker = new THREE.Mesh(markerGeo, pinMat);
+            machine.angleMarker.position.set(-30, 0, 20);
+            bendHead.add(machine.angleMarker);
+
+            scene.add(bendHead);
+            machine.bendHead = bendHead;
+
+            // ==================== MESA DE SAIDA ====================
+            const tableGeo = new THREE.BoxGeometry(200, 10, 150);
+            const table = new THREE.Mesh(tableGeo, darkMat);
+            table.position.set(250, 0, 0);
+            table.castShadow = true;
+            table.receiveShadow = true;
+            scene.add(table);
+
+            // ==================== GUIA DO FIO (alimentador -> cabecote) ====================
+            const wireGuideGeo = new THREE.BoxGeometry(150, 20, 20);
+            const wireGuide = new THREE.Mesh(wireGuideGeo, darkMat);
+            wireGuide.position.set(-25, 50, 0);
+            scene.add(wireGuide);
+        }
+
+        function addRollerLines(roller) {
+            const lineMat = new THREE.MeshBasicMaterial({ color: 0x333333 });
+            for (let i = 0; i < 6; i++) {
+                const lineGeo = new THREE.BoxGeometry(2, 50, 2);
+                const line = new THREE.Mesh(lineGeo, lineMat);
+                const angle = (i / 6) * Math.PI * 2;
+                line.position.set(Math.cos(angle) * 20, 0, Math.sin(angle) * 20);
+                roller.add(line);
+            }
+        }
+
+        // ============================================================================
+        // ARAME
+        // ============================================================================
+        function resetWire() {
+            wirePoints = [
+                new THREE.Vector3(-250, 50, 0),  // Entrada
+                new THREE.Vector3(100, 50, 0)    // No cabecote
+            ];
+            feedPosition = 0;
+            updateWireMesh();
+        }
+
+        function updateWireMesh() {
+            if (wireMesh) {
+                scene.remove(wireMesh);
+                wireMesh.geometry.dispose();
+            }
+
+            if (wirePoints.length < 2) return;
+
+            // Criar curva suave
+            const curve = new THREE.CatmullRomCurve3(wirePoints, false, 'catmullrom', 0.1);
+            const tubeGeo = new THREE.TubeGeometry(curve, wirePoints.length * 8, 5, 8, false);
+            const wireMat = new THREE.MeshStandardMaterial({
+                color: COLORS.wire,
+                metalness: 0.7,
+                roughness: 0.3
+            });
+
+            wireMesh = new THREE.Mesh(tubeGeo, wireMat);
+            wireMesh.castShadow = true;
+            scene.add(wireMesh);
+        }
+
+        // ============================================================================
+        // LOGICA DE SIMULACAO
+        // ============================================================================
+        function startProgram(programKey) {
+            if (isRunning) return;
+
+            currentProgram = PROGRAMS[programKey];
+            operationQueue = [...currentProgram.steps];
+            currentOp = null;
+            opProgress = 0;
+            isRunning = true;
+            bendAngle = 0;
+
+            resetWire();
+            updateStatus('EXECUTANDO', true);
+            updateButtons(true);
+        }
+
+        function emergencyStop() {
+            isRunning = false;
+            currentOp = null;
+            operationQueue = [];
+            updateStatus('PARADA EMERGENCIA', false);
+            updateButtons(false);
+        }
+
+        function finishProgram() {
+            isRunning = false;
+            productionCount++;
+            document.getElementById('productionCounter').textContent = productionCount;
+            updateStatus('CONCLUIDO', false);
+            updateButtons(false);
+
+            // Limpar apos delay
+            setTimeout(() => {
+                resetWire();
+                bendAngle = 0;
+                updateMachineVisuals();
+                updateStatus('AGUARDANDO', false);
+            }, 2000);
+        }
+
+        function update() {
+            if (!isRunning) return;
+
+            // Pegar proxima operacao
+            if (!currentOp) {
+                if (operationQueue.length === 0) {
+                    finishProgram();
+                    return;
+                }
+                currentOp = operationQueue.shift();
+                opProgress = 0;
+            }
+
+            // Executar operacao atual
+            const speed = animationSpeed;
+            let done = false;
+
+            switch (currentOp.type) {
+                case 'feed':
+                    done = executeFeed(currentOp.value, speed);
+                    break;
+                case 'bend':
+                    done = executeBend(currentOp.value, speed);
+                    break;
+                case 'cut':
+                    done = executeCut(speed);
+                    break;
+            }
+
+            if (done) {
+                currentOp = null;
+            }
+
+            updateMachineVisuals();
+        }
+
+        function executeFeed(targetLength, speed) {
+            const feedSpeed = 2 * speed;
+
+            if (opProgress < targetLength) {
+                opProgress += feedSpeed;
+                feedPosition += feedSpeed;
+
+                // Rotacionar rolos
+                rollerRotation += 0.1 * speed;
+                machine.rollerTop.rotation.z = rollerRotation;
+                machine.rollerBottom.rotation.z = -rollerRotation;
+
+                // Estender o fio
+                const lastPoint = wirePoints[wirePoints.length - 1].clone();
+                const direction = new THREE.Vector3(1, 0, 0); // Avanca em X
+
+                // Se houver dobra, calcular direcao
+                if (wirePoints.length > 2) {
+                    const prev = wirePoints[wirePoints.length - 2];
+                    const curr = wirePoints[wirePoints.length - 1];
+                    direction.subVectors(curr, prev).normalize();
+                }
+
+                lastPoint.add(direction.multiplyScalar(feedSpeed));
+                wirePoints[wirePoints.length - 1] = lastPoint;
+                updateWireMesh();
+
+                document.getElementById('feedDisplay').textContent = Math.round(feedPosition);
+                return false;
+            }
+
+            return true;
+        }
+
+        function executeBend(targetAngle, speed) {
+            const bendSpeed = 1.5 * speed;
+
+            if (opProgress < targetAngle) {
+                opProgress += bendSpeed;
+                bendAngle += bendSpeed;
+
+                // Rotacionar elementos do cabecote
+                const angleRad = THREE.MathUtils.degToRad(bendAngle);
+                machine.bendPin.position.x = -55 * Math.cos(angleRad);
+                machine.bendPin.position.y = -55 * Math.sin(angleRad);
+                machine.angleMarker.rotation.z = -angleRad;
+
+                // Adicionar ponto de dobra no fio
+                if (opProgress >= targetAngle * 0.5 && wirePoints.length < 50) {
+                    const lastPoint = wirePoints[wirePoints.length - 1].clone();
+                    // Calcular nova direcao apos dobra
+                    const newAngle = THREE.MathUtils.degToRad(-targetAngle);
+                    const rotatedDir = new THREE.Vector3(
+                        Math.cos(newAngle),
+                        Math.sin(newAngle),
+                        0
+                    );
+                    wirePoints.push(lastPoint.clone().add(rotatedDir.multiplyScalar(5)));
+                }
+
+                document.getElementById('angleDisplay').textContent = bendAngle.toFixed(1);
+                return false;
+            }
+
+            // Resetar pino apos dobra
+            bendAngle = 0;
+            machine.bendPin.position.set(-55, 0, 25);
+            machine.angleMarker.rotation.z = 0;
+            document.getElementById('angleDisplay').textContent = '0.0';
+            return true;
+        }
+
+        function executeCut(speed) {
+            opProgress += speed;
+            if (opProgress < 30) {
+                return false;
+            }
+            return true;
+        }
+
+        function updateMachineVisuals() {
+            // Atualizacoes visuais adicionais podem ser adicionadas aqui
+        }
+
+        // ============================================================================
+        // UI
+        // ============================================================================
+        function setupUI() {
+            document.getElementById('btnSquare').addEventListener('click', () => startProgram('square'));
+            document.getElementById('btnRect').addEventListener('click', () => startProgram('rectangle'));
+            document.getElementById('btnTriangle').addEventListener('click', () => startProgram('triangle'));
+            document.getElementById('btnStop').addEventListener('click', emergencyStop);
+
+            document.getElementById('speedSlider').addEventListener('input', (e) => {
+                animationSpeed = parseFloat(e.target.value);
+                document.getElementById('speedValue').textContent = animationSpeed.toFixed(1) + 'x';
+            });
+        }
+
+        function updateStatus(status, running) {
+            const el = document.getElementById('statusDisplay');
+            el.textContent = status;
+            el.classList.toggle('running', running);
+        }
+
+        function updateButtons(disabled) {
+            document.getElementById('btnSquare').disabled = disabled;
+            document.getElementById('btnRect').disabled = disabled;
+            document.getElementById('btnTriangle').disabled = disabled;
+        }
+
+        function onWindowResize() {
+            const container = document.getElementById('canvas3d');
+            camera.aspect = container.clientWidth / container.clientHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(container.clientWidth, container.clientHeight);
+        }
+
+        // ============================================================================
+        // LOOP DE ANIMACAO
+        // ============================================================================
+        function animate() {
+            requestAnimationFrame(animate);
+            update();
+            controls.update();
+            renderer.render(scene, camera);
+        }
+
+        // Iniciar
+        init();
+        console.log('Estribadeira 3D inicializada');
+    </script>
+</body>
+</html>

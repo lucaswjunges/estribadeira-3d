@@ -1,0 +1,540 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Wire Bending Machine 3D - HowToMechatronics</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #1a1a1a;
+            color: #e0e0e0;
+            overflow: hidden;
+            height: 100vh;
+        }
+
+        #canvas3d {
+            width: 100%;
+            height: 100%;
+        }
+
+        .overlay {
+            position: absolute;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(26, 26, 26, 0.95);
+            padding: 15px 30px;
+            border-radius: 8px;
+            border: 2px solid #3a7bc8;
+            text-align: center;
+            z-index: 100;
+        }
+
+        .overlay h2 {
+            font-size: 18px;
+            color: #3a7bc8;
+            font-weight: 600;
+        }
+
+        .overlay p {
+            font-size: 11px;
+            color: #888;
+            margin-top: 5px;
+        }
+
+        .loading {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(26, 26, 26, 0.95);
+            padding: 30px 50px;
+            border-radius: 10px;
+            border: 2px solid #3a7bc8;
+            text-align: center;
+            z-index: 200;
+        }
+
+        .loading h3 {
+            color: #3a7bc8;
+            margin-bottom: 15px;
+        }
+
+        .loading-bar {
+            width: 200px;
+            height: 6px;
+            background: #2a2a2a;
+            border-radius: 3px;
+            overflow: hidden;
+        }
+
+        .loading-progress {
+            height: 100%;
+            background: linear-gradient(90deg, #3a7bc8, #00ff88);
+            width: 0%;
+            transition: width 0.3s;
+        }
+
+        .loading-text {
+            margin-top: 10px;
+            font-size: 12px;
+            color: #888;
+        }
+
+        .controls {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            background: rgba(26, 26, 26, 0.95);
+            padding: 15px;
+            border-radius: 8px;
+            border: 1px solid #3a3a3a;
+            z-index: 100;
+        }
+
+        .controls h4 {
+            color: #3a7bc8;
+            margin-bottom: 10px;
+            font-size: 12px;
+        }
+
+        .controls p {
+            font-size: 11px;
+            color: #888;
+            margin: 3px 0;
+        }
+
+        .part-list {
+            position: absolute;
+            top: 80px;
+            right: 20px;
+            background: rgba(26, 26, 26, 0.95);
+            padding: 15px;
+            border-radius: 8px;
+            border: 1px solid #3a3a3a;
+            z-index: 100;
+            max-height: 70vh;
+            overflow-y: auto;
+        }
+
+        .part-list h4 {
+            color: #3a7bc8;
+            margin-bottom: 10px;
+            font-size: 12px;
+        }
+
+        .part-item {
+            display: flex;
+            align-items: center;
+            padding: 5px 0;
+            font-size: 11px;
+            border-bottom: 1px solid #2a2a2a;
+        }
+
+        .part-item:last-child {
+            border-bottom: none;
+        }
+
+        .part-color {
+            width: 12px;
+            height: 12px;
+            border-radius: 3px;
+            margin-right: 8px;
+        }
+
+        .part-name {
+            color: #ccc;
+        }
+
+        .btn-reset {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            background: #3a7bc8;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 12px;
+            z-index: 100;
+        }
+
+        .btn-reset:hover {
+            background: #4a8bd8;
+        }
+    </style>
+</head>
+<body>
+    <div class="overlay">
+        <h2>Arduino 3D Wire Bending Machine</h2>
+        <p>Modelo: HowToMechatronics | Arraste para rotacionar</p>
+    </div>
+
+    <div class="loading" id="loadingScreen">
+        <h3>Carregando Modelo 3D</h3>
+        <div class="loading-bar">
+            <div class="loading-progress" id="loadingProgress"></div>
+        </div>
+        <div class="loading-text" id="loadingText">Iniciando...</div>
+    </div>
+
+    <div class="controls">
+        <h4>Controles da Camera</h4>
+        <p>Botao esquerdo: Rotacionar</p>
+        <p>Scroll: Zoom</p>
+        <p>Botao direito: Mover</p>
+    </div>
+
+    <div class="part-list" id="partList">
+        <h4>Componentes Carregados</h4>
+        <!-- Populated by JS -->
+    </div>
+
+    <button class="btn-reset" onclick="resetCamera()">Resetar Camera</button>
+
+    <div id="canvas3d"></div>
+
+    <!-- Three.js -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/STLLoader.js"></script>
+
+    <script>
+        // ============================================================================
+        // CONFIGURACAO
+        // ============================================================================
+        let scene, camera, renderer, controls;
+        let loadedParts = [];
+        let loadingComplete = false;
+
+        // Definicao das pecas com cores e posicoes aproximadas
+        const PARTS = [
+            {
+                file: 'Feeder.STL',
+                name: 'Alimentador',
+                color: 0x4a90d9,
+                position: { x: -80, y: 0, z: 0 },
+                rotation: { x: 0, y: 0, z: 0 },
+                scale: 1
+            },
+            {
+                file: 'Straightener roller.STL',
+                name: 'Rolo Endireitador',
+                color: 0x666666,
+                position: { x: -120, y: 0, z: 0 },
+                rotation: { x: Math.PI/2, y: 0, z: 0 },
+                scale: 1
+            },
+            {
+                file: 'Bender gear 1.STL',
+                name: 'Engrenagem Dobrador 1',
+                color: 0x3d7cbf,
+                position: { x: 50, y: 0, z: 0 },
+                rotation: { x: Math.PI/2, y: 0, z: 0 },
+                scale: 1
+            },
+            {
+                file: 'bender gear modified.STL',
+                name: 'Engrenagem Modificada',
+                color: 0x2d6caf,
+                position: { x: 50, y: 30, z: 0 },
+                rotation: { x: Math.PI/2, y: 0, z: 0 },
+                scale: 1
+            },
+            {
+                file: 'Bender nozzle.STL',
+                name: 'Bico Dobrador',
+                color: 0xff6600,
+                position: { x: 80, y: 0, z: 0 },
+                rotation: { x: 0, y: 0, z: 0 },
+                scale: 1
+            },
+            {
+                file: 'rack pin.STL',
+                name: 'Pino Cremalheira',
+                color: 0xcc4400,
+                position: { x: 100, y: 0, z: 0 },
+                rotation: { x: 0, y: 0, z: 0 },
+                scale: 1
+            },
+            {
+                file: 'Z-axis gear 1.STL',
+                name: 'Engrenagem Eixo Z 1',
+                color: 0x5588cc,
+                position: { x: 0, y: 50, z: 0 },
+                rotation: { x: 0, y: 0, z: 0 },
+                scale: 1
+            },
+            {
+                file: 'Z-axis gear 2.STL',
+                name: 'Engrenagem Eixo Z 2',
+                color: 0x4478bc,
+                position: { x: 0, y: 80, z: 0 },
+                rotation: { x: 0, y: 0, z: 0 },
+                scale: 1
+            },
+            {
+                file: 'Servo - pinion gear.STL',
+                name: 'Pinhao Servo',
+                color: 0x888888,
+                position: { x: 120, y: 20, z: 0 },
+                rotation: { x: 0, y: 0, z: 0 },
+                scale: 1
+            },
+            {
+                file: 'Nema 17 mount.STL',
+                name: 'Suporte NEMA 17',
+                color: 0x333333,
+                position: { x: -50, y: -30, z: 0 },
+                rotation: { x: 0, y: 0, z: 0 },
+                scale: 1
+            },
+            {
+                file: 'Pillow block.STL',
+                name: 'Mancal',
+                color: 0x3a6090,
+                position: { x: -30, y: 0, z: 30 },
+                rotation: { x: 0, y: 0, z: 0 },
+                scale: 1
+            },
+            {
+                file: 'Shaft clamp.STL',
+                name: 'Bracadeira Eixo',
+                color: 0x4a7ab0,
+                position: { x: 0, y: 0, z: -30 },
+                rotation: { x: 0, y: 0, z: 0 },
+                scale: 1
+            }
+        ];
+
+        // ============================================================================
+        // INICIALIZACAO
+        // ============================================================================
+        function init() {
+            const container = document.getElementById('canvas3d');
+
+            // Cena
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x1a1a1a);
+
+            // Camera
+            camera = new THREE.PerspectiveCamera(
+                50,
+                window.innerWidth / window.innerHeight,
+                0.1,
+                5000
+            );
+            camera.position.set(200, 150, 300);
+
+            // Renderer
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setPixelRatio(window.devicePixelRatio);
+            renderer.shadowMap.enabled = true;
+            container.appendChild(renderer.domElement);
+
+            // Controles
+            controls = new THREE.OrbitControls(camera, renderer.domElement);
+            controls.enableDamping = true;
+            controls.dampingFactor = 0.05;
+            controls.target.set(0, 20, 0);
+
+            // Luzes
+            setupLights();
+
+            // Grid e chao
+            createEnvironment();
+
+            // Carregar STLs
+            loadAllSTLs();
+
+            // Eventos
+            window.addEventListener('resize', onWindowResize);
+
+            // Loop
+            animate();
+        }
+
+        function setupLights() {
+            // Ambiente
+            const ambient = new THREE.AmbientLight(0xffffff, 0.5);
+            scene.add(ambient);
+
+            // Principal
+            const main = new THREE.DirectionalLight(0xffffff, 0.8);
+            main.position.set(200, 300, 200);
+            main.castShadow = true;
+            scene.add(main);
+
+            // Preenchimento
+            const fill = new THREE.DirectionalLight(0x4488ff, 0.3);
+            fill.position.set(-100, 100, -100);
+            scene.add(fill);
+
+            // Rim light
+            const rim = new THREE.DirectionalLight(0xffffff, 0.2);
+            rim.position.set(0, -100, -200);
+            scene.add(rim);
+        }
+
+        function createEnvironment() {
+            // Grid
+            const grid = new THREE.GridHelper(500, 25, 0x444444, 0x333333);
+            grid.position.y = -50;
+            scene.add(grid);
+
+            // Eixos (pequenos, para referencia)
+            const axes = new THREE.AxesHelper(50);
+            axes.position.y = -49;
+            scene.add(axes);
+        }
+
+        // ============================================================================
+        // CARREGAMENTO DOS STLs
+        // ============================================================================
+        function loadAllSTLs() {
+            const loader = new THREE.STLLoader();
+            let loaded = 0;
+            const total = PARTS.length;
+
+            PARTS.forEach((part, index) => {
+                const filePath = 'models/' + part.file;
+
+                updateLoading(loaded, total, 'Carregando: ' + part.name);
+
+                loader.load(
+                    filePath,
+                    (geometry) => {
+                        // Criar material
+                        const material = new THREE.MeshStandardMaterial({
+                            color: part.color,
+                            metalness: 0.3,
+                            roughness: 0.6,
+                            flatShading: false
+                        });
+
+                        // Criar mesh
+                        const mesh = new THREE.Mesh(geometry, material);
+
+                        // Aplicar transformacoes
+                        mesh.position.set(part.position.x, part.position.y, part.position.z);
+                        mesh.rotation.set(part.rotation.x, part.rotation.y, part.rotation.z);
+                        mesh.scale.setScalar(part.scale);
+
+                        // Sombras
+                        mesh.castShadow = true;
+                        mesh.receiveShadow = true;
+
+                        // Adicionar a cena
+                        scene.add(mesh);
+                        loadedParts.push({ mesh, part });
+
+                        // Atualizar progresso
+                        loaded++;
+                        updateLoading(loaded, total, 'Carregado: ' + part.name);
+
+                        // Adicionar a lista de pecas
+                        addPartToList(part);
+
+                        // Verificar se terminou
+                        if (loaded === total) {
+                            finishLoading();
+                        }
+                    },
+                    (progress) => {
+                        // Progress callback
+                    },
+                    (error) => {
+                        console.error('Erro ao carregar ' + part.file + ':', error);
+                        loaded++;
+                        if (loaded === total) {
+                            finishLoading();
+                        }
+                    }
+                );
+            });
+        }
+
+        function updateLoading(loaded, total, text) {
+            const percent = (loaded / total) * 100;
+            document.getElementById('loadingProgress').style.width = percent + '%';
+            document.getElementById('loadingText').textContent = text;
+        }
+
+        function finishLoading() {
+            loadingComplete = true;
+            document.getElementById('loadingScreen').style.display = 'none';
+
+            // Centralizar camera nas pecas carregadas
+            centerCameraOnParts();
+
+            console.log('Todos os modelos carregados!');
+        }
+
+        function addPartToList(part) {
+            const list = document.getElementById('partList');
+            const item = document.createElement('div');
+            item.className = 'part-item';
+            item.innerHTML = `
+                <div class="part-color" style="background: #${part.color.toString(16).padStart(6, '0')}"></div>
+                <span class="part-name">${part.name}</span>
+            `;
+            list.appendChild(item);
+        }
+
+        function centerCameraOnParts() {
+            if (loadedParts.length === 0) return;
+
+            // Calcular bounding box de todas as pecas
+            const box = new THREE.Box3();
+            loadedParts.forEach(({ mesh }) => {
+                box.expandByObject(mesh);
+            });
+
+            const center = box.getCenter(new THREE.Vector3());
+            const size = box.getSize(new THREE.Vector3());
+
+            // Ajustar target dos controles
+            controls.target.copy(center);
+
+            // Ajustar posicao da camera
+            const maxDim = Math.max(size.x, size.y, size.z);
+            camera.position.set(
+                center.x + maxDim * 1.5,
+                center.y + maxDim,
+                center.z + maxDim * 1.5
+            );
+        }
+
+        function resetCamera() {
+            centerCameraOnParts();
+        }
+
+        // ============================================================================
+        // LOOP E EVENTOS
+        // ============================================================================
+        function animate() {
+            requestAnimationFrame(animate);
+            controls.update();
+            renderer.render(scene, camera);
+        }
+
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        // Iniciar
+        init();
+    </script>
+</body>
+</html>

@@ -1,0 +1,887 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Simulação Estribadeira Industrial - STR B12</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #1a1a1a;
+            color: #e0e0e0;
+            overflow: hidden;
+            height: 100vh;
+        }
+
+        .container {
+            display: flex;
+            height: 100vh;
+        }
+
+        /* Área do Canvas */
+        .canvas-area {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            background: linear-gradient(135deg, #1e1e1e 0%, #2d2d2d 100%);
+            padding: 20px;
+            position: relative;
+        }
+
+        canvas {
+            border: 2px solid #3a3a3a;
+            border-radius: 8px;
+            background: #0d0d0d;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6);
+        }
+
+        /* Painel de Controle */
+        .control-panel {
+            width: 380px;
+            background: linear-gradient(180deg, #252525 0%, #1a1a1a 100%);
+            border-left: 3px solid #3a7bc8;
+            padding: 30px;
+            overflow-y: auto;
+            box-shadow: -5px 0 20px rgba(0, 0, 0, 0.5);
+        }
+
+        .panel-header {
+            text-align: center;
+            margin-bottom: 30px;
+            padding-bottom: 20px;
+            border-bottom: 2px solid #3a7bc8;
+        }
+
+        .panel-header h1 {
+            font-size: 22px;
+            color: #3a7bc8;
+            font-weight: 600;
+            margin-bottom: 5px;
+        }
+
+        .panel-header p {
+            font-size: 12px;
+            color: #888;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        /* Displays de Status */
+        .status-displays {
+            margin-bottom: 30px;
+        }
+
+        .display {
+            background: #0d0d0d;
+            border: 2px solid #2a2a2a;
+            border-radius: 6px;
+            padding: 15px;
+            margin-bottom: 15px;
+            box-shadow: inset 0 2px 10px rgba(0, 0, 0, 0.5);
+        }
+
+        .display-label {
+            font-size: 11px;
+            color: #888;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 8px;
+        }
+
+        .display-value {
+            font-size: 28px;
+            font-weight: 700;
+            color: #00ff88;
+            font-family: 'Courier New', monospace;
+            text-shadow: 0 0 10px rgba(0, 255, 136, 0.5);
+        }
+
+        .display-value.status {
+            font-size: 16px;
+            color: #3a7bc8;
+        }
+
+        .display-value.status.running {
+            color: #ff9500;
+            animation: pulse 1.5s ease-in-out infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.6; }
+        }
+
+        /* Botões de Controle */
+        .control-buttons {
+            margin-bottom: 30px;
+        }
+
+        .section-title {
+            font-size: 14px;
+            color: #3a7bc8;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 15px;
+            font-weight: 600;
+        }
+
+        .btn {
+            width: 100%;
+            padding: 18px;
+            margin-bottom: 12px;
+            border: none;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .btn::before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 0;
+            height: 0;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.2);
+            transform: translate(-50%, -50%);
+            transition: width 0.6s, height 0.6s;
+        }
+
+        .btn:active::before {
+            width: 300px;
+            height: 300px;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #3a7bc8 0%, #2a5a9a 100%);
+            color: white;
+            box-shadow: 0 4px 15px rgba(58, 123, 200, 0.4);
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(58, 123, 200, 0.6);
+        }
+
+        .btn-primary:disabled {
+            background: #3a3a3a;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+
+        .btn-stop {
+            background: linear-gradient(135deg, #d32f2f 0%, #a82020 100%);
+            color: white;
+            box-shadow: 0 4px 15px rgba(211, 47, 47, 0.4);
+        }
+
+        .btn-stop:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(211, 47, 47, 0.6);
+        }
+
+        /* Production Counter */
+        .production-counter {
+            background: #0d0d0d;
+            border: 2px solid #2a2a2a;
+            border-radius: 6px;
+            padding: 20px;
+            text-align: center;
+        }
+
+        .counter-label {
+            font-size: 11px;
+            color: #888;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 10px;
+        }
+
+        .counter-value {
+            font-size: 48px;
+            font-weight: 700;
+            color: #00ff88;
+            font-family: 'Courier New', monospace;
+            text-shadow: 0 0 15px rgba(0, 255, 136, 0.5);
+        }
+
+        /* Machine Title */
+        .machine-title {
+            position: absolute;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(26, 26, 26, 0.9);
+            padding: 15px 30px;
+            border-radius: 8px;
+            border: 2px solid #3a7bc8;
+            backdrop-filter: blur(10px);
+        }
+
+        .machine-title h2 {
+            font-size: 18px;
+            color: #3a7bc8;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Área do Canvas -->
+        <div class="canvas-area">
+            <div class="machine-title">
+                <h2>Estribadeira Automática STR-B12</h2>
+            </div>
+            <canvas id="machineCanvas" width="1000" height="700"></canvas>
+        </div>
+
+        <!-- Painel de Controle -->
+        <div class="control-panel">
+            <div class="panel-header">
+                <h1>PAINEL DE CONTROLE</h1>
+                <p>Sistema de Automação Industrial</p>
+            </div>
+
+            <!-- Displays de Status -->
+            <div class="status-displays">
+                <div class="display">
+                    <div class="display-label">Status Operacional</div>
+                    <div class="display-value status" id="statusDisplay">AGUARDANDO</div>
+                </div>
+                <div class="display">
+                    <div class="display-label">Ângulo Atual (°)</div>
+                    <div class="display-value" id="angleDisplay">0</div>
+                </div>
+                <div class="display">
+                    <div class="display-label">Comprimento Alimentado (mm)</div>
+                    <div class="display-value" id="lengthDisplay">0</div>
+                </div>
+            </div>
+
+            <!-- Botões de Produção -->
+            <div class="control-buttons">
+                <div class="section-title">Programas de Produção</div>
+                <button class="btn btn-primary" id="btnSquare">
+                    📐 Estribo Quadrado 20x20
+                </button>
+                <button class="btn btn-primary" id="btnRectangle">
+                    📏 Estribo Retangular 15x40
+                </button>
+                <button class="btn btn-primary" id="btnTriangle">
+                    🔺 Estribo Triangular
+                </button>
+                <button class="btn btn-stop" id="btnStop">
+                    ⛔ PARADA DE EMERGÊNCIA
+                </button>
+            </div>
+
+            <!-- Contador de Produção -->
+            <div class="production-counter">
+                <div class="counter-label">Peças Produzidas</div>
+                <div class="counter-value" id="productionCounter">0</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ============================================================================
+        // CONFIGURAÇÕES E CONSTANTES
+        // ============================================================================
+        const canvas = document.getElementById('machineCanvas');
+        const ctx = canvas.getContext('2d');
+
+        // Cores do sistema (paleta industrial)
+        const COLORS = {
+            background: '#0d0d0d',
+            machineBody: '#4a6fa5',
+            machineDark: '#2a4a75',
+            movingParts: '#ff9500',
+            danger: '#ff4500',
+            wire: '#e8e8e8',
+            wireShine: '#ffffff',
+            feederRoller: '#5a5a5a',
+            cutterBlade: '#c0c0c0'
+        };
+
+        // Parâmetros de simulação (ajustáveis)
+        const SIMULATION = {
+            feedSpeed: 2.5,        // Velocidade de avanço do fio (pixels/frame)
+            bendSpeed: 0.08,       // Velocidade de dobra (radianos/frame)
+            cutDuration: 15,       // Duração da animação de corte (frames)
+            bendPause: 10          // Pausa após dobra (frames)
+        };
+
+        // Estados da máquina
+        const STATE = {
+            IDLE: 'idle',
+            FEEDING: 'feeding',
+            BENDING: 'bending',
+            CUTTING: 'cutting',
+            RESETTING: 'resetting'
+        };
+
+        // ============================================================================
+        // VARIÁVEIS DE ESTADO DA MÁQUINA
+        // ============================================================================
+        let currentState = STATE.IDLE;
+        let isRunning = false;
+        let currentProgram = null;
+        let productionCount = 0;
+
+        // Propriedades do fio
+        let wirePoints = [];        // Array de pontos que formam o fio
+        let currentLength = 0;      // Comprimento atual alimentado
+        let bendAngle = 0;          // Ângulo atual de dobra
+        let bendDirection = 1;      // Direção da dobra (1 ou -1)
+
+        // Propriedades da tesoura
+        let cutterOpen = true;
+        let cutterAnimation = 0;
+
+        // Fila de operações (steps do programa atual)
+        let operationQueue = [];
+        let currentOperation = null;
+        let operationProgress = 0;
+
+        // ============================================================================
+        // DEFINIÇÕES DE PROGRAMAS (RECEITAS)
+        // ============================================================================
+        const PROGRAMS = {
+            square20x20: {
+                name: 'Estribo Quadrado 20x20',
+                steps: [
+                    { type: 'feed', length: 50 },   // Alimenta 50mm
+                    { type: 'bend', angle: 90 },    // Dobra 90° para direita
+                    { type: 'feed', length: 200 },  // Alimenta 200mm (lado)
+                    { type: 'bend', angle: 90 },    // Dobra 90°
+                    { type: 'feed', length: 200 },  // Alimenta 200mm (lado)
+                    { type: 'bend', angle: 90 },    // Dobra 90°
+                    { type: 'feed', length: 200 },  // Alimenta 200mm (lado)
+                    { type: 'bend', angle: 90 },    // Dobra 90°
+                    { type: 'feed', length: 150 },  // Alimenta 150mm (fechamento)
+                    { type: 'cut' }                 // Corta
+                ]
+            },
+            rectangle15x40: {
+                name: 'Estribo Retangular 15x40',
+                steps: [
+                    { type: 'feed', length: 50 },
+                    { type: 'bend', angle: 90 },
+                    { type: 'feed', length: 150 },  // Lado curto 15cm
+                    { type: 'bend', angle: 90 },
+                    { type: 'feed', length: 400 },  // Lado longo 40cm
+                    { type: 'bend', angle: 90 },
+                    { type: 'feed', length: 150 },  // Lado curto
+                    { type: 'bend', angle: 90 },
+                    { type: 'feed', length: 350 },  // Fechamento
+                    { type: 'cut' }
+                ]
+            },
+            triangle: {
+                name: 'Estribo Triangular',
+                steps: [
+                    { type: 'feed', length: 50 },
+                    { type: 'bend', angle: 120 },   // Ângulo de 120° (triângulo equilátero)
+                    { type: 'feed', length: 300 },
+                    { type: 'bend', angle: 120 },
+                    { type: 'feed', length: 300 },
+                    { type: 'bend', angle: 120 },
+                    { type: 'feed', length: 250 },
+                    { type: 'cut' }
+                ]
+            }
+        };
+
+        // ============================================================================
+        // FUNÇÕES DE DESENHO (RENDERING)
+        // ============================================================================
+
+        /**
+         * Limpa o canvas completamente
+         */
+        function clearCanvas() {
+            ctx.fillStyle = COLORS.background;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+        }
+
+        /**
+         * Desenha o alimentador de fio (rolos empurrando o vergalhão)
+         */
+        function drawFeeder() {
+            const feederX = 100;
+            const feederY = canvas.height / 2;
+            const rollerRadius = 30;
+
+            // Corpo do alimentador
+            ctx.fillStyle = COLORS.machineDark;
+            ctx.fillRect(feederX - 60, feederY - 80, 120, 160);
+
+            // Rolos superior e inferior (animados quando alimentando)
+            const rotation = isRunning && currentState === STATE.FEEDING
+                ? (Date.now() / 100) % (Math.PI * 2)
+                : 0;
+
+            // Rolo superior
+            drawRoller(feederX, feederY - 40, rollerRadius, rotation);
+            // Rolo inferior
+            drawRoller(feederX, feederY + 40, rollerRadius, -rotation);
+
+            // Indicador de entrada do fio
+            ctx.strokeStyle = COLORS.wire;
+            ctx.lineWidth = 4;
+            ctx.beginPath();
+            ctx.moveTo(20, feederY);
+            ctx.lineTo(feederX - 60, feederY);
+            ctx.stroke();
+        }
+
+        /**
+         * Desenha um rolo com linhas radiais para indicar rotação
+         */
+        function drawRoller(x, y, radius, rotation) {
+            // Corpo do rolo
+            ctx.fillStyle = COLORS.feederRoller;
+            ctx.beginPath();
+            ctx.arc(x, y, radius, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Linhas radiais para visualizar rotação
+            ctx.strokeStyle = '#3a3a3a';
+            ctx.lineWidth = 3;
+            for (let i = 0; i < 6; i++) {
+                const angle = rotation + (i * Math.PI / 3);
+                ctx.beginPath();
+                ctx.moveTo(x, y);
+                ctx.lineTo(
+                    x + Math.cos(angle) * radius,
+                    y + Math.sin(angle) * radius
+                );
+                ctx.stroke();
+            }
+        }
+
+        /**
+         * Desenha o cabeçote de dobra (disco com pino fixo e pino móvel)
+         */
+        function drawBendingHead() {
+            const headX = 400;
+            const headY = canvas.height / 2;
+            const headRadius = 60;
+
+            // Base do cabeçote
+            ctx.fillStyle = COLORS.machineBody;
+            ctx.beginPath();
+            ctx.arc(headX, headY, headRadius + 20, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Disco rotativo
+            ctx.fillStyle = COLORS.machineDark;
+            ctx.beginPath();
+            ctx.arc(headX, headY, headRadius, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Pino fixo (guia do fio)
+            ctx.fillStyle = COLORS.danger;
+            ctx.beginPath();
+            ctx.arc(headX + headRadius, headY, 12, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Pino móvel (executa a dobra) - rota com bendAngle
+            const pinAngle = Math.PI + bendAngle; // Começa à esquerda
+            const pinX = headX + Math.cos(pinAngle) * headRadius;
+            const pinY = headY + Math.sin(pinAngle) * headRadius;
+
+            ctx.fillStyle = COLORS.movingParts;
+            ctx.beginPath();
+            ctx.arc(pinX, pinY, 12, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Indicador de ângulo (linha do centro até o pino móvel)
+            ctx.strokeStyle = COLORS.movingParts;
+            ctx.lineWidth = 2;
+            ctx.setLineDash([5, 5]);
+            ctx.beginPath();
+            ctx.moveTo(headX, headY);
+            ctx.lineTo(pinX, pinY);
+            ctx.stroke();
+            ctx.setLineDash([]);
+        }
+
+        /**
+         * Desenha a tesoura/guilhotina
+         */
+        function drawCutter() {
+            const cutterX = 300;
+            const cutterY = canvas.height / 2;
+            const bladeHeight = cutterOpen ? 0 : 60;
+
+            // Estrutura da tesoura
+            ctx.fillStyle = COLORS.machineBody;
+            ctx.fillRect(cutterX - 20, cutterY - 100, 40, 80);
+            ctx.fillRect(cutterX - 20, cutterY + 60, 40, 80);
+
+            // Lâmina superior (animada)
+            ctx.fillStyle = COLORS.cutterBlade;
+            ctx.fillRect(cutterX - 15, cutterY - 100 + (60 - bladeHeight), 30, bladeHeight);
+
+            // Lâmina inferior (fixa)
+            ctx.fillRect(cutterX - 15, cutterY + 60, 30, 15);
+
+            // Indicador de perigo quando fechada
+            if (!cutterOpen) {
+                ctx.strokeStyle = COLORS.danger;
+                ctx.lineWidth = 3;
+                ctx.strokeRect(cutterX - 25, cutterY - 110, 50, 220);
+            }
+        }
+
+        /**
+         * Desenha o vergalhão (fio) baseado nos pontos calculados
+         */
+        function drawWire() {
+            if (wirePoints.length < 2) return;
+
+            // Sombra do fio (efeito de profundidade)
+            ctx.strokeStyle = 'rgba(0, 0, 0, 0.3)';
+            ctx.lineWidth = 8;
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
+            ctx.beginPath();
+            ctx.moveTo(wirePoints[0].x + 2, wirePoints[0].y + 2);
+            for (let i = 1; i < wirePoints.length; i++) {
+                ctx.lineTo(wirePoints[i].x + 2, wirePoints[i].y + 2);
+            }
+            ctx.stroke();
+
+            // Fio principal
+            ctx.strokeStyle = COLORS.wire;
+            ctx.lineWidth = 6;
+            ctx.beginPath();
+            ctx.moveTo(wirePoints[0].x, wirePoints[0].y);
+            for (let i = 1; i < wirePoints.length; i++) {
+                ctx.lineTo(wirePoints[i].x, wirePoints[i].y);
+            }
+            ctx.stroke();
+
+            // Brilho no fio (highlight)
+            ctx.strokeStyle = COLORS.wireShine;
+            ctx.lineWidth = 2;
+            ctx.globalAlpha = 0.5;
+            ctx.beginPath();
+            ctx.moveTo(wirePoints[0].x, wirePoints[0].y - 2);
+            for (let i = 1; i < wirePoints.length; i++) {
+                ctx.lineTo(wirePoints[i].x, wirePoints[i].y - 2);
+            }
+            ctx.stroke();
+            ctx.globalAlpha = 1.0;
+        }
+
+        /**
+         * Desenha a área de coleta de peças prontas
+         */
+        function drawCollectionArea() {
+            const areaX = 450;
+            const areaY = canvas.height / 2 + 150;
+
+            ctx.fillStyle = COLORS.machineDark;
+            ctx.fillRect(areaX, areaY, 150, 80);
+
+            ctx.fillStyle = '#888';
+            ctx.font = '14px Arial';
+            ctx.textAlign = 'center';
+            ctx.fillText('COLETA', areaX + 75, areaY + 45);
+        }
+
+        /**
+         * Função principal de renderização (chama todos os desenhos)
+         */
+        function render() {
+            clearCanvas();
+            drawFeeder();
+            drawCutter();
+            drawBendingHead();
+            drawWire();
+            drawCollectionArea();
+        }
+
+        // ============================================================================
+        // LÓGICA DE SIMULAÇÃO (MÁQUINA DE ESTADOS)
+        // ============================================================================
+
+        /**
+         * Inicia a execução de um programa
+         */
+        function startProgram(program) {
+            if (isRunning) return; // Previne múltiplas execuções simultâneas
+
+            isRunning = true;
+            currentProgram = program;
+            operationQueue = [...program.steps]; // Clona o array de operações
+            currentOperation = null;
+            operationProgress = 0;
+
+            // Reseta o fio para posição inicial
+            wirePoints = [{ x: 100, y: canvas.height / 2 }];
+            currentLength = 0;
+            bendAngle = 0;
+
+            updateStatusDisplay('EM OPERAÇÃO', true);
+        }
+
+        /**
+         * Para a execução emergencialmente
+         */
+        function emergencyStop() {
+            isRunning = false;
+            currentState = STATE.IDLE;
+            operationQueue = [];
+            currentOperation = null;
+            updateStatusDisplay('PARADA DE EMERGÊNCIA', false);
+        }
+
+        /**
+         * Pega a próxima operação da fila
+         */
+        function getNextOperation() {
+            if (operationQueue.length === 0) {
+                // Programa completo - finaliza
+                finishProgram();
+                return null;
+            }
+            return operationQueue.shift();
+        }
+
+        /**
+         * Finaliza o programa e incrementa contador
+         */
+        function finishProgram() {
+            isRunning = false;
+            currentState = STATE.IDLE;
+            productionCount++;
+            updateProductionCounter();
+            updateStatusDisplay('CONCLUÍDO', false);
+
+            // Anima a peça caindo (limpa o fio após um delay)
+            setTimeout(() => {
+                wirePoints = [{ x: 100, y: canvas.height / 2 }];
+                currentLength = 0;
+                bendAngle = 0;
+                updateStatusDisplay('AGUARDANDO', false);
+            }, 1000);
+        }
+
+        /**
+         * Executa a operação de alimentação do fio
+         */
+        function executeFeed(targetLength) {
+            if (currentLength < targetLength) {
+                // Continua alimentando
+                currentLength += SIMULATION.feedSpeed;
+
+                // Adiciona novo ponto ao fio (horizontal para direita)
+                const lastPoint = wirePoints[wirePoints.length - 1];
+                wirePoints[wirePoints.length - 1] = {
+                    x: lastPoint.x + SIMULATION.feedSpeed,
+                    y: lastPoint.y
+                };
+
+                updateLengthDisplay();
+                return false; // Não concluído
+            } else {
+                // Alimentação completa
+                currentState = STATE.IDLE;
+                return true; // Concluído
+            }
+        }
+
+        /**
+         * Executa a operação de dobra
+         */
+        function executeBend(targetAngle) {
+            const targetRad = (targetAngle * Math.PI) / 180;
+
+            if (Math.abs(bendAngle) < Math.abs(targetRad)) {
+                // Continua dobrando
+                bendAngle += SIMULATION.bendSpeed * bendDirection;
+
+                // Adiciona novo segmento ao fio (curvo)
+                const lastPoint = wirePoints[wirePoints.length - 1];
+                const newAngle = Math.atan2(
+                    lastPoint.y - wirePoints[wirePoints.length - 2].y,
+                    lastPoint.x - wirePoints[wirePoints.length - 2].x
+                ) + SIMULATION.bendSpeed * bendDirection;
+
+                wirePoints.push({
+                    x: lastPoint.x + Math.cos(newAngle) * SIMULATION.feedSpeed,
+                    y: lastPoint.y + Math.sin(newAngle) * SIMULATION.feedSpeed
+                });
+
+                updateAngleDisplay();
+                return false; // Não concluído
+            } else {
+                // Dobra completa - reseta o ângulo e pausa
+                bendAngle = 0;
+                bendDirection *= -1; // Alterna direção para próxima dobra
+                currentState = STATE.IDLE;
+                operationProgress = 0;
+                return true; // Concluído
+            }
+        }
+
+        /**
+         * Executa a operação de corte
+         */
+        function executeCut() {
+            if (operationProgress < SIMULATION.cutDuration) {
+                // Anima o fechamento da tesoura
+                cutterOpen = operationProgress < SIMULATION.cutDuration / 2;
+                operationProgress++;
+                return false;
+            } else {
+                // Corte completo
+                cutterOpen = true;
+                currentState = STATE.IDLE;
+                operationProgress = 0;
+                return true;
+            }
+        }
+
+        /**
+         * Loop principal de atualização (state machine)
+         */
+        function update() {
+            if (!isRunning) return;
+
+            // Se não há operação atual, pega a próxima da fila
+            if (currentOperation === null) {
+                currentOperation = getNextOperation();
+                operationProgress = 0;
+                currentLength = 0; // Reseta para cada feed
+            }
+
+            if (currentOperation === null) return; // Fila vazia
+
+            // Executa a operação atual
+            let isComplete = false;
+
+            switch (currentOperation.type) {
+                case 'feed':
+                    currentState = STATE.FEEDING;
+                    isComplete = executeFeed(currentOperation.length);
+                    break;
+                case 'bend':
+                    currentState = STATE.BENDING;
+                    isComplete = executeBend(currentOperation.angle);
+                    break;
+                case 'cut':
+                    currentState = STATE.CUTTING;
+                    isComplete = executeCut();
+                    break;
+            }
+
+            // Se a operação foi concluída, limpa para pegar a próxima
+            if (isComplete) {
+                currentOperation = null;
+            }
+        }
+
+        /**
+         * Loop de animação principal (requestAnimationFrame)
+         */
+        function animate() {
+            update();
+            render();
+            requestAnimationFrame(animate);
+        }
+
+        // ============================================================================
+        // ATUALIZAÇÕES DA INTERFACE
+        // ============================================================================
+
+        function updateStatusDisplay(status, isRunning) {
+            const display = document.getElementById('statusDisplay');
+            display.textContent = status;
+            if (isRunning) {
+                display.classList.add('running');
+            } else {
+                display.classList.remove('running');
+            }
+        }
+
+        function updateAngleDisplay() {
+            const angleDeg = Math.abs((bendAngle * 180) / Math.PI).toFixed(1);
+            document.getElementById('angleDisplay').textContent = angleDeg;
+        }
+
+        function updateLengthDisplay() {
+            document.getElementById('lengthDisplay').textContent = Math.round(currentLength);
+        }
+
+        function updateProductionCounter() {
+            document.getElementById('productionCounter').textContent = productionCount;
+        }
+
+        function updateButtonStates() {
+            const buttons = document.querySelectorAll('.btn-primary');
+            buttons.forEach(btn => {
+                btn.disabled = isRunning;
+            });
+        }
+
+        // ============================================================================
+        // EVENT LISTENERS (CONTROLES DO PAINEL)
+        // ============================================================================
+
+        document.getElementById('btnSquare').addEventListener('click', () => {
+            startProgram(PROGRAMS.square20x20);
+            updateButtonStates();
+        });
+
+        document.getElementById('btnRectangle').addEventListener('click', () => {
+            startProgram(PROGRAMS.rectangle15x40);
+            updateButtonStates();
+        });
+
+        document.getElementById('btnTriangle').addEventListener('click', () => {
+            startProgram(PROGRAMS.triangle);
+            updateButtonStates();
+        });
+
+        document.getElementById('btnStop').addEventListener('click', () => {
+            emergencyStop();
+            updateButtonStates();
+        });
+
+        // ============================================================================
+        // INICIALIZAÇÃO
+        // ============================================================================
+
+        // Inicializa o fio na posição de início
+        wirePoints = [{ x: 100, y: canvas.height / 2 }];
+
+        // Inicia o loop de animação
+        animate();
+
+        console.log('✅ Simulação da Estribadeira STR-B12 iniciada');
+        console.log('📊 Use os botões do painel para produzir estribos');
+    </script>
+</body>
+</html>

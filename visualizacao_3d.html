@@ -1,0 +1,670 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Visualizacao 3D - Estribadeira</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #1a1a1a;
+            color: #e0e0e0;
+            overflow: hidden;
+            height: 100vh;
+        }
+
+        .container {
+            display: flex;
+            height: 100vh;
+        }
+
+        /* Area do Canvas 3D */
+        .canvas-area {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+        }
+
+        #canvas3d {
+            width: 100%;
+            height: 100%;
+        }
+
+        /* Overlay de instrucoes */
+        .instructions {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 15px;
+            border-radius: 8px;
+            font-size: 12px;
+            color: #888;
+        }
+
+        .instructions h4 {
+            color: #3a7bc8;
+            margin-bottom: 8px;
+        }
+
+        /* Painel de Controle */
+        .control-panel {
+            width: 380px;
+            background: linear-gradient(180deg, #252525 0%, #1a1a1a 100%);
+            border-left: 3px solid #3a7bc8;
+            padding: 30px;
+            overflow-y: auto;
+            box-shadow: -5px 0 20px rgba(0, 0, 0, 0.5);
+        }
+
+        .panel-header {
+            text-align: center;
+            margin-bottom: 30px;
+            padding-bottom: 20px;
+            border-bottom: 2px solid #3a7bc8;
+        }
+
+        .panel-header h1 {
+            font-size: 20px;
+            color: #3a7bc8;
+            font-weight: 600;
+            margin-bottom: 5px;
+        }
+
+        .panel-header p {
+            font-size: 12px;
+            color: #888;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .section-title {
+            font-size: 14px;
+            color: #3a7bc8;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 15px;
+            margin-top: 20px;
+            font-weight: 600;
+        }
+
+        /* Tabela de comandos */
+        .command-table {
+            width: 100%;
+            background: #0d0d0d;
+            border: 2px solid #2a2a2a;
+            border-radius: 6px;
+            margin-bottom: 20px;
+            overflow: hidden;
+        }
+
+        .command-table table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .command-table th {
+            background: #2a2a2a;
+            padding: 10px;
+            text-align: center;
+            font-size: 11px;
+            color: #888;
+            text-transform: uppercase;
+        }
+
+        .command-table td {
+            padding: 8px;
+            text-align: center;
+            border-bottom: 1px solid #2a2a2a;
+        }
+
+        .command-table input {
+            width: 50px;
+            background: #1a1a1a;
+            border: 1px solid #3a3a3a;
+            color: #00ff88;
+            padding: 5px;
+            text-align: center;
+            border-radius: 4px;
+            font-family: 'Courier New', monospace;
+        }
+
+        .command-table input:focus {
+            outline: none;
+            border-color: #3a7bc8;
+        }
+
+        .command-table .delete-btn {
+            background: #d32f2f;
+            border: none;
+            color: white;
+            width: 24px;
+            height: 24px;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+
+        .command-table .delete-btn:hover {
+            background: #ff4444;
+        }
+
+        /* Botoes */
+        .btn {
+            width: 100%;
+            padding: 15px;
+            margin-bottom: 10px;
+            border: none;
+            border-radius: 6px;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #3a7bc8 0%, #2a5a9a 100%);
+            color: white;
+            box-shadow: 0 4px 15px rgba(58, 123, 200, 0.4);
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(58, 123, 200, 0.6);
+        }
+
+        .btn-secondary {
+            background: linear-gradient(135deg, #4a4a4a 0%, #3a3a3a 100%);
+            color: white;
+        }
+
+        .btn-secondary:hover {
+            background: linear-gradient(135deg, #5a5a5a 0%, #4a4a4a 100%);
+        }
+
+        .btn-success {
+            background: linear-gradient(135deg, #2e7d32 0%, #1b5e20 100%);
+            color: white;
+        }
+
+        .btn-success:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(46, 125, 50, 0.6);
+        }
+
+        /* Presets */
+        .preset-buttons {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        .preset-btn {
+            padding: 12px 10px;
+            background: #2a2a2a;
+            border: 1px solid #3a3a3a;
+            color: #e0e0e0;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 11px;
+            transition: all 0.2s;
+        }
+
+        .preset-btn:hover {
+            background: #3a3a3a;
+            border-color: #3a7bc8;
+        }
+
+        /* Estatisticas */
+        .stats {
+            background: #0d0d0d;
+            border: 2px solid #2a2a2a;
+            border-radius: 6px;
+            padding: 15px;
+            margin-top: 20px;
+        }
+
+        .stat-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+            border-bottom: 1px solid #2a2a2a;
+        }
+
+        .stat-row:last-child {
+            border-bottom: none;
+        }
+
+        .stat-label {
+            color: #888;
+            font-size: 12px;
+        }
+
+        .stat-value {
+            color: #00ff88;
+            font-family: 'Courier New', monospace;
+            font-weight: bold;
+        }
+
+        /* Title overlay */
+        .title-overlay {
+            position: absolute;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(26, 26, 26, 0.9);
+            padding: 15px 30px;
+            border-radius: 8px;
+            border: 2px solid #3a7bc8;
+            text-align: center;
+        }
+
+        .title-overlay h2 {
+            font-size: 18px;
+            color: #3a7bc8;
+            font-weight: 600;
+        }
+
+        .title-overlay p {
+            font-size: 11px;
+            color: #888;
+            margin-top: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Area do Canvas 3D -->
+        <div class="canvas-area">
+            <div class="title-overlay">
+                <h2>Visualizacao 3D - Preview do Estribo</h2>
+                <p>Arraste para rotacionar | Scroll para zoom</p>
+            </div>
+            <div id="canvas3d"></div>
+            <div class="instructions">
+                <h4>Controles</h4>
+                <p>Botao esquerdo: Rotacionar</p>
+                <p>Scroll: Zoom</p>
+                <p>Botao direito: Mover</p>
+            </div>
+        </div>
+
+        <!-- Painel de Controle -->
+        <div class="control-panel">
+            <div class="panel-header">
+                <h1>EDITOR DE FORMA</h1>
+                <p>Defina as dobras do estribo</p>
+            </div>
+
+            <!-- Presets -->
+            <div class="section-title">Formas Predefinidas</div>
+            <div class="preset-buttons">
+                <button class="preset-btn" onclick="loadPreset('square')">Quadrado</button>
+                <button class="preset-btn" onclick="loadPreset('rectangle')">Retangular</button>
+                <button class="preset-btn" onclick="loadPreset('triangle')">Triangular</button>
+                <button class="preset-btn" onclick="loadPreset('spiral')">Espiral</button>
+                <button class="preset-btn" onclick="loadPreset('star')">Estrela</button>
+                <button class="preset-btn" onclick="loadPreset('hexagon')">Hexagono</button>
+            </div>
+
+            <!-- Tabela de comandos -->
+            <div class="section-title">Sequencia de Dobras</div>
+            <div class="command-table">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>#</th>
+                            <th>Avanco (mm)</th>
+                            <th>Dobra XY</th>
+                            <th>Dobra Z</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody id="commandList">
+                        <!-- Comandos serao inseridos aqui -->
+                    </tbody>
+                </table>
+            </div>
+
+            <button class="btn btn-secondary" onclick="addCommand()">+ Adicionar Passo</button>
+            <button class="btn btn-primary" onclick="updatePreview()">Atualizar Preview</button>
+
+            <!-- Estatisticas -->
+            <div class="stats">
+                <div class="stat-row">
+                    <span class="stat-label">Total de Passos:</span>
+                    <span class="stat-value" id="statSteps">0</span>
+                </div>
+                <div class="stat-row">
+                    <span class="stat-label">Comprimento Total:</span>
+                    <span class="stat-value" id="statLength">0 mm</span>
+                </div>
+                <div class="stat-row">
+                    <span class="stat-label">Dobras XY:</span>
+                    <span class="stat-value" id="statBendsXY">0</span>
+                </div>
+                <div class="stat-row">
+                    <span class="stat-label">Dobras Z (3D):</span>
+                    <span class="stat-value" id="statBendsZ">0</span>
+                </div>
+            </div>
+
+            <div class="section-title" style="margin-top: 30px;">Exportar</div>
+            <button class="btn btn-success" onclick="exportCommands()">Exportar para CLP</button>
+        </div>
+    </div>
+
+    <!-- Three.js via CDN -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+
+    <script>
+        // ============================================================================
+        // CONFIGURACAO THREE.JS
+        // ============================================================================
+        let scene, camera, renderer, controls;
+        let wireMesh = null;
+        let gridHelper, axesHelper;
+
+        // Array de comandos (formato: {feed, bendXY, bendZ})
+        let commands = [];
+
+        // Presets de formas
+        const PRESETS = {
+            square: [
+                { feed: 50, bendXY: 90, bendZ: 0 },
+                { feed: 200, bendXY: 90, bendZ: 0 },
+                { feed: 200, bendXY: 90, bendZ: 0 },
+                { feed: 200, bendXY: 90, bendZ: 0 },
+                { feed: 150, bendXY: 0, bendZ: 0 }
+            ],
+            rectangle: [
+                { feed: 50, bendXY: 90, bendZ: 0 },
+                { feed: 150, bendXY: 90, bendZ: 0 },
+                { feed: 300, bendXY: 90, bendZ: 0 },
+                { feed: 150, bendXY: 90, bendZ: 0 },
+                { feed: 250, bendXY: 0, bendZ: 0 }
+            ],
+            triangle: [
+                { feed: 50, bendXY: 120, bendZ: 0 },
+                { feed: 250, bendXY: 120, bendZ: 0 },
+                { feed: 250, bendXY: 120, bendZ: 0 },
+                { feed: 200, bendXY: 0, bendZ: 0 }
+            ],
+            spiral: [
+                { feed: 30, bendXY: 45, bendZ: 10 },
+                { feed: 30, bendXY: 45, bendZ: 10 },
+                { feed: 30, bendXY: 45, bendZ: 10 },
+                { feed: 30, bendXY: 45, bendZ: 10 },
+                { feed: 30, bendXY: 45, bendZ: 10 },
+                { feed: 30, bendXY: 45, bendZ: 10 },
+                { feed: 30, bendXY: 45, bendZ: 10 },
+                { feed: 30, bendXY: 45, bendZ: 10 }
+            ],
+            star: [
+                { feed: 80, bendXY: 144, bendZ: 0 },
+                { feed: 80, bendXY: -72, bendZ: 0 },
+                { feed: 80, bendXY: 144, bendZ: 0 },
+                { feed: 80, bendXY: -72, bendZ: 0 },
+                { feed: 80, bendXY: 144, bendZ: 0 },
+                { feed: 80, bendXY: -72, bendZ: 0 },
+                { feed: 80, bendXY: 144, bendZ: 0 },
+                { feed: 80, bendXY: -72, bendZ: 0 },
+                { feed: 80, bendXY: 144, bendZ: 0 },
+                { feed: 80, bendXY: 0, bendZ: 0 }
+            ],
+            hexagon: [
+                { feed: 50, bendXY: 60, bendZ: 0 },
+                { feed: 150, bendXY: 60, bendZ: 0 },
+                { feed: 150, bendXY: 60, bendZ: 0 },
+                { feed: 150, bendXY: 60, bendZ: 0 },
+                { feed: 150, bendXY: 60, bendZ: 0 },
+                { feed: 150, bendXY: 60, bendZ: 0 },
+                { feed: 100, bendXY: 0, bendZ: 0 }
+            ]
+        };
+
+        // ============================================================================
+        // INICIALIZACAO
+        // ============================================================================
+        function init() {
+            const container = document.getElementById('canvas3d');
+
+            // Cena
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x1a1a1a);
+
+            // Camera
+            camera = new THREE.PerspectiveCamera(
+                60,
+                container.clientWidth / container.clientHeight,
+                1,
+                10000
+            );
+            camera.position.set(300, 300, 500);
+
+            // Renderer
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(container.clientWidth, container.clientHeight);
+            renderer.setPixelRatio(window.devicePixelRatio);
+            container.appendChild(renderer.domElement);
+
+            // Controles de orbita
+            controls = new THREE.OrbitControls(camera, renderer.domElement);
+            controls.enableDamping = true;
+            controls.dampingFactor = 0.05;
+            controls.screenSpacePanning = true;
+
+            // Grid
+            gridHelper = new THREE.GridHelper(1000, 20, 0x3a3a3a, 0x2a2a2a);
+            scene.add(gridHelper);
+
+            // Eixos
+            axesHelper = new THREE.AxesHelper(200);
+            scene.add(axesHelper);
+
+            // Luz ambiente
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+            scene.add(ambientLight);
+
+            // Luz direcional
+            const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+            directionalLight.position.set(200, 500, 300);
+            scene.add(directionalLight);
+
+            // Resize handler
+            window.addEventListener('resize', onWindowResize);
+
+            // Carrega preset inicial
+            loadPreset('square');
+
+            // Inicia animacao
+            animate();
+        }
+
+        function onWindowResize() {
+            const container = document.getElementById('canvas3d');
+            camera.aspect = container.clientWidth / container.clientHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(container.clientWidth, container.clientHeight);
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+            controls.update();
+            renderer.render(scene, camera);
+        }
+
+        // ============================================================================
+        // GERACAO DO ARAME 3D (baseado no codigo Processing do DIWire)
+        // ============================================================================
+        function generateWireGeometry(commands) {
+            const points = [];
+            let currentPos = new THREE.Vector3(0, 0, 0);
+            let currentDir = new THREE.Vector3(1, 0, 0); // Direcao inicial: eixo X
+            let upVector = new THREE.Vector3(0, 1, 0);   // Vetor "up" para dobras Z
+
+            points.push(currentPos.clone());
+
+            for (const cmd of commands) {
+                // 1. Avanca na direcao atual
+                const feedVector = currentDir.clone().multiplyScalar(cmd.feed);
+                currentPos.add(feedVector);
+                points.push(currentPos.clone());
+
+                // 2. Aplica dobra XY (rotacao em torno do eixo Z local)
+                if (cmd.bendXY !== 0) {
+                    const angleXY = THREE.MathUtils.degToRad(-cmd.bendXY);
+                    const rotationXY = new THREE.Quaternion();
+                    rotationXY.setFromAxisAngle(upVector, angleXY);
+                    currentDir.applyQuaternion(rotationXY);
+                }
+
+                // 3. Aplica dobra Z (rotacao em torno do eixo perpendicular)
+                if (cmd.bendZ !== 0) {
+                    const angleZ = THREE.MathUtils.degToRad(-cmd.bendZ);
+                    const perpVector = new THREE.Vector3().crossVectors(currentDir, upVector).normalize();
+                    const rotationZ = new THREE.Quaternion();
+                    rotationZ.setFromAxisAngle(perpVector, angleZ);
+                    currentDir.applyQuaternion(rotationZ);
+                    upVector.applyQuaternion(rotationZ);
+                }
+            }
+
+            return points;
+        }
+
+        function updateWireMesh() {
+            // Remove mesh anterior
+            if (wireMesh) {
+                scene.remove(wireMesh);
+                wireMesh.geometry.dispose();
+                wireMesh.material.dispose();
+            }
+
+            if (commands.length === 0) return;
+
+            // Gera pontos
+            const points = generateWireGeometry(commands);
+
+            // Cria geometria do tubo (arame)
+            const curve = new THREE.CatmullRomCurve3(points, false, 'catmullrom', 0);
+            const tubeGeometry = new THREE.TubeGeometry(curve, points.length * 10, 4, 8, false);
+
+            // Material metalico
+            const material = new THREE.MeshStandardMaterial({
+                color: 0xc0c0c0,
+                metalness: 0.8,
+                roughness: 0.3
+            });
+
+            wireMesh = new THREE.Mesh(tubeGeometry, material);
+            scene.add(wireMesh);
+
+            // Centraliza camera no objeto
+            const box = new THREE.Box3().setFromObject(wireMesh);
+            const center = box.getCenter(new THREE.Vector3());
+            controls.target.copy(center);
+        }
+
+        // ============================================================================
+        // INTERFACE DO USUARIO
+        // ============================================================================
+        function loadPreset(presetName) {
+            if (PRESETS[presetName]) {
+                commands = JSON.parse(JSON.stringify(PRESETS[presetName]));
+                renderCommandList();
+                updatePreview();
+            }
+        }
+
+        function renderCommandList() {
+            const container = document.getElementById('commandList');
+            container.innerHTML = '';
+
+            commands.forEach((cmd, index) => {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td style="color: #888;">${index + 1}</td>
+                    <td><input type="number" value="${cmd.feed}" onchange="updateCommand(${index}, 'feed', this.value)" /></td>
+                    <td><input type="number" value="${cmd.bendXY}" onchange="updateCommand(${index}, 'bendXY', this.value)" /></td>
+                    <td><input type="number" value="${cmd.bendZ}" onchange="updateCommand(${index}, 'bendZ', this.value)" /></td>
+                    <td><button class="delete-btn" onclick="deleteCommand(${index})">X</button></td>
+                `;
+                container.appendChild(row);
+            });
+
+            updateStats();
+        }
+
+        function addCommand() {
+            commands.push({ feed: 100, bendXY: 0, bendZ: 0 });
+            renderCommandList();
+            updatePreview();
+        }
+
+        function deleteCommand(index) {
+            commands.splice(index, 1);
+            renderCommandList();
+            updatePreview();
+        }
+
+        function updateCommand(index, field, value) {
+            commands[index][field] = parseInt(value) || 0;
+            updatePreview();
+        }
+
+        function updatePreview() {
+            updateWireMesh();
+            updateStats();
+        }
+
+        function updateStats() {
+            const totalSteps = commands.length;
+            const totalLength = commands.reduce((sum, cmd) => sum + cmd.feed, 0);
+            const bendsXY = commands.filter(cmd => cmd.bendXY !== 0).length;
+            const bendsZ = commands.filter(cmd => cmd.bendZ !== 0).length;
+
+            document.getElementById('statSteps').textContent = totalSteps;
+            document.getElementById('statLength').textContent = totalLength + ' mm';
+            document.getElementById('statBendsXY').textContent = bendsXY;
+            document.getElementById('statBendsZ').textContent = bendsZ;
+        }
+
+        function exportCommands() {
+            // Formato compativel com o CLP Atos
+            let output = '# Programa de Dobra - Estribadeira\n';
+            output += '# Formato: AVANCO(mm) | DOBRA_XY(graus) | DOBRA_Z(graus)\n';
+            output += '# Gerado em: ' + new Date().toLocaleString() + '\n\n';
+
+            commands.forEach((cmd, index) => {
+                output += `${cmd.feed}\t${cmd.bendXY}\t${cmd.bendZ}\n`;
+            });
+
+            // Cria download
+            const blob = new Blob([output], { type: 'text/plain' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'programa_estribo.txt';
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+
+        // ============================================================================
+        // INICIALIZACAO
+        // ============================================================================
+        init();
+        console.log('Visualizacao 3D iniciada - baseada no DIWire-Bender');
+    </script>
+</body>
+</html>
