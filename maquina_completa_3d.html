@@ -428,34 +428,33 @@
                     12,  // Placa Secundaria
                     13,  // Suporte Motor NEMA
                     14,  // Caixa Engrenagens
+                    15,  // Placa Motor (engrenagem fixa na caixa)
                     16,  // Coluna 1
                     17,  // Porca 1
                     18,  // Porca 2
                     19,  // Rolamento 1
-                    20,  // Bloco Dobrador
                     21,  // Parafuso 1
                     22,  // Parafuso 2
                     23,  // Parafuso 3
-                    24,  // Eixo Vertical
-                    25,  // Bracadeira Eixo
-                    30,  // Pino Guia
                 ],
                 // Sub-grupos que giram dentro deste grupo
                 subGroups: {
-                    placaMotor: {
-                        pivot: [432.2, -240.5, 159.8],  // Centro da Placa Motor
-                        axis: 'z',  // Gira em Z (engrenagem)
+                    // Mecanismo do dobrador - oscila ao redor da Coluna 1
+                    mecanismoDobrador: {
+                        pivot: [492.2, -240.43, 156.35],  // Centro da Coluna 1
+                        axis: 'z',  // Oscila em Z ao redor da Coluna 1
                         speed: 0.04,
-                        parts: [15],  // Apenas Placa Motor
-                        // Sub-sub-grupo: Motor Principal gira no proprio eixo
-                        subGroups: {
-                            motorPrincipal: {
-                                pivot: [475, -240.5, 159.8],  // Centro do Motor Principal
-                                axis: 'z',  // Motor gira em Z (eixo do motor)
-                                speed: 0.08,
-                                parts: [26]  // Motor Principal
-                            }
-                        }
+                        oscillate: true,  // Oscila em vez de girar continuamente
+                        minAngle: 175 * Math.PI / 180,  // Limite minimo (175 graus)
+                        maxAngle: 375 * Math.PI / 180,  // Limite maximo (375 graus)
+                        direction: -1,  // Direcao inicial (-1 = anti-horario, começa indo para -65)
+                        parts: [
+                            20,  // Bloco Dobrador
+                            24,  // Eixo Vertical
+                            25,  // Bracadeira Eixo
+                            26,  // Motor Principal
+                            30,  // Pino Guia
+                        ]
                     }
                 }
             }
@@ -953,7 +952,50 @@
                 }
             }
 
-            // Animar grupos mecanicos
+            // Funcao recursiva para animar sub-grupos
+            function animateSubGroups(subGroupsConfig, parentName) {
+                if (!subGroupsConfig) return;
+
+                for (const [subName, subConfig] of Object.entries(subGroupsConfig)) {
+                    const fullName = `${parentName}_${subName}`;
+                    const subGroup = mechGroups[fullName];
+                    if (subGroup) {
+                        let rotationAxis;
+                        switch (subConfig.axis) {
+                            case 'x': rotationAxis = 'x'; break;
+                            case 'y': rotationAxis = 'y'; break;
+                            case 'z': rotationAxis = 'z'; break;
+                        }
+
+                        if (subConfig.oscillate) {
+                            // Movimento oscilatorio com limites
+                            const currentAngle = subGroup.rotation[rotationAxis];
+                            const newAngle = currentAngle + subConfig.speed * subConfig.direction;
+
+                            // Verificar limites e inverter direcao se necessario
+                            if (newAngle >= subConfig.maxAngle) {
+                                subGroup.rotation[rotationAxis] = subConfig.maxAngle;
+                                subConfig.direction = -1;
+                            } else if (newAngle <= subConfig.minAngle) {
+                                subGroup.rotation[rotationAxis] = subConfig.minAngle;
+                                subConfig.direction = 1;
+                            } else {
+                                subGroup.rotation[rotationAxis] = newAngle;
+                            }
+                        } else {
+                            // Rotacao continua
+                            subGroup.rotation[rotationAxis] += subConfig.speed;
+                        }
+                    }
+
+                    // Recursivamente animar sub-sub-grupos
+                    if (subConfig.subGroups) {
+                        animateSubGroups(subConfig.subGroups, fullName);
+                    }
+                }
+            }
+
+            // Animar grupos mecanicos principais
             for (const [name, config] of Object.entries(mechanicalGroups)) {
                 const group = mechGroups[name];
                 if (group) {
@@ -970,25 +1012,8 @@
                     }
                 }
 
-                // Animar sub-grupos (rotacao composta - giram dentro do grupo pai)
-                if (config.subGroups) {
-                    for (const [subName, subConfig] of Object.entries(config.subGroups)) {
-                        const subGroup = mechGroups[`${name}_${subName}`];
-                        if (subGroup) {
-                            switch (subConfig.axis) {
-                                case 'x':
-                                    subGroup.rotation.x += subConfig.speed;
-                                    break;
-                                case 'y':
-                                    subGroup.rotation.y += subConfig.speed;
-                                    break;
-                                case 'z':
-                                    subGroup.rotation.z += subConfig.speed;
-                                    break;
-                            }
-                        }
-                    }
-                }
+                // Animar sub-grupos recursivamente
+                animateSubGroups(config.subGroups, name);
             }
         }
 
