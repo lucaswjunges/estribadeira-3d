@@ -219,6 +219,28 @@
             background: #555;
             border-radius: 3px;
         }
+
+        .credits {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(26, 26, 26, 0.9);
+            padding: 8px 20px;
+            border-radius: 20px;
+            font-size: 11px;
+            color: #888;
+            z-index: 100;
+        }
+
+        .credits a {
+            color: #00ff88;
+            text-decoration: none;
+        }
+
+        .credits a:hover {
+            text-decoration: underline;
+        }
     </style>
 </head>
 <body>
@@ -253,6 +275,10 @@
         <button class="btn btn-secondary" onclick="toggleWireframe()">Wireframe</button>
         <button class="btn btn-secondary" onclick="toggleAutoRotate()">Auto Rotacao</button>
         <button class="btn btn-secondary" onclick="cycleBackground()">Mudar Fundo</button>
+    </div>
+
+    <div class="credits">
+        Desenvolvido por <a href="https://www.linkedin.com/in/lucas-william-junges-a95b00143/" target="_blank">Eng. Lucas Junges</a>
     </div>
 
     <div id="canvas3d"></div>
