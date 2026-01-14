@@ -271,7 +271,8 @@
     </div>
 
     <div class="btn-group">
-        <button class="btn" onclick="resetCamera()">Resetar Camera</button>
+        <button class="btn" onclick="toggleSimulation()" id="btnSimular">Simular</button>
+        <button class="btn btn-secondary" onclick="resetCamera()">Resetar Camera</button>
         <button class="btn btn-secondary" onclick="toggleWireframe()">Wireframe</button>
         <button class="btn btn-secondary" onclick="toggleAutoRotate()">Auto Rotacao</button>
         <button class="btn btn-secondary" onclick="cycleBackground()">Mudar Fundo</button>
@@ -399,6 +400,70 @@
 
         let loadedCount = 0;
         let totalParts = 0;
+        let isSimulating = false;
+
+        // Configuracao de animacao das pecas rotativas individuais
+        // (giram no proprio eixo, sem orbitar)
+        const animatedParts = {
+            29: { axis: 'x', speed: 0.03 },  // Engrenagem Z2 - gira no proprio eixo X
+        };
+
+        // Grupos mecanicos - pecas que giram juntas em torno de um pivo comum
+        const mechanicalGroups = {
+            // Mecanismo principal - gira ao redor do eixo X
+            // Engrenagem Z1 + Eixo Guia + Mancais + etc (SEM Placa Motor e Motor Principal)
+            eixoPrincipal: {
+                pivot: [300, -240.5, 185],  // Centro aproximado no eixo do arame
+                axis: 'x',
+                speed: 0.02,
+                parts: [
+                    28,  // Engrenagem Z 1
+                    1,   // Eixo Guia Arame
+                    6,   // Mancal Esquerdo
+                    7,   // Mancal Direito
+                    8,   // Espacador E
+                    9,   // Espacador D
+                    10,  // Arruela 1
+                    11,  // Arruela 2
+                    12,  // Placa Secundaria
+                    13,  // Suporte Motor NEMA
+                    14,  // Caixa Engrenagens
+                    16,  // Coluna 1
+                    17,  // Porca 1
+                    18,  // Porca 2
+                    19,  // Rolamento 1
+                    20,  // Bloco Dobrador
+                    21,  // Parafuso 1
+                    22,  // Parafuso 2
+                    23,  // Parafuso 3
+                    24,  // Eixo Vertical
+                    25,  // Bracadeira Eixo
+                    30,  // Pino Guia
+                ],
+                // Sub-grupos que giram dentro deste grupo
+                subGroups: {
+                    placaMotor: {
+                        pivot: [432.2, -240.5, 159.8],  // Centro da Placa Motor
+                        axis: 'z',  // Gira em Z (engrenagem)
+                        speed: 0.04,
+                        parts: [15],  // Apenas Placa Motor
+                        // Sub-sub-grupo: Motor Principal gira no proprio eixo
+                        subGroups: {
+                            motorPrincipal: {
+                                pivot: [475, -240.5, 159.8],  // Centro do Motor Principal
+                                axis: 'z',  // Motor gira em Z (eixo do motor)
+                                speed: 0.08,
+                                parts: [26]  // Motor Principal
+                            }
+                        }
+                    }
+                }
+            }
+            // Bocal Dobrador (72) e Engrenagem Z2 (29) ficam parados/giram no lugar
+        };
+
+        // Grupos Three.js para mecanismos
+        const mechGroups = {};
 
         // ============================================================================
         // INICIALIZACAO
@@ -450,6 +515,15 @@
             grid.position.y = -10;
             scene.add(grid);
 
+            // Eixos globais (vermelho=X, verde=Y, azul=Z)
+            const axesHelper = new THREE.AxesHelper(200);
+            scene.add(axesHelper);
+
+            // Labels dos eixos
+            addAxisLabel('X', 210, 0, 0, 0xff0000);
+            addAxisLabel('Y', 0, 210, 0, 0x00ff00);
+            addAxisLabel('Z', 0, 0, 210, 0x0000ff);
+
             // Grupo para o modelo
             modelGroup = new THREE.Group();
             scene.add(modelGroup);
@@ -463,6 +537,25 @@
 
             // Loop
             animate();
+        }
+
+        function addAxisLabel(text, x, y, z, color) {
+            const canvas = document.createElement('canvas');
+            canvas.width = 64;
+            canvas.height = 64;
+            const ctx = canvas.getContext('2d');
+            ctx.fillStyle = '#' + color.toString(16).padStart(6, '0');
+            ctx.font = 'bold 48px Arial';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(text, 32, 32);
+
+            const texture = new THREE.CanvasTexture(canvas);
+            const material = new THREE.SpriteMaterial({ map: texture });
+            const sprite = new THREE.Sprite(material);
+            sprite.position.set(x, y, z);
+            sprite.scale.set(30, 30, 1);
+            scene.add(sprite);
         }
 
         function setupLights() {
@@ -613,15 +706,38 @@
                             flatShading: false
                         });
 
-                        // Criar mesh
-                        const mesh = new THREE.Mesh(geometry, material);
+                        // Verificar se a peca pertence a um grupo mecanico
+                        let isInMechGroup = false;
+                        for (const config of Object.values(mechanicalGroups)) {
+                            if (config.parts.includes(index)) {
+                                isInMechGroup = true;
+                                break;
+                            }
+                        }
+
+                        // Para pecas animadas individualmente, centralizar a geometria
+                        let mesh;
+                        if (animatedParts[index] && !isInMechGroup) {
+                            // Calcular centro da geometria
+                            geometry.computeBoundingBox();
+                            const center = new THREE.Vector3();
+                            geometry.boundingBox.getCenter(center);
+
+                            // Centralizar a geometria (mover vertices para origem)
+                            geometry.translate(-center.x, -center.y, -center.z);
+
+                            // Criar mesh e posicionar no centro original
+                            mesh = new THREE.Mesh(geometry, material);
+                            mesh.position.copy(center);
+                        } else {
+                            // Pecas estaticas ou de grupos mecanicos - manter posicao original
+                            mesh = new THREE.Mesh(geometry, material);
+                        }
+
                         mesh.castShadow = true;
                         mesh.receiveShadow = true;
                         mesh.userData.partName = partNames[index] || `Peca ${index}`;
                         mesh.userData.partIndex = index;
-
-                        // Posicionar na posicao original do STEP
-                        // (a geometria ja vem na posicao correta)
 
                         partMeshes[index] = mesh;
                         modelGroup.add(mesh);
@@ -648,6 +764,9 @@
 
         function onAllPartsLoaded() {
             console.log('Todas as pecas carregadas!');
+
+            // Criar grupos mecanicos
+            setupMechanicalGroups();
 
             // Centralizar o grupo
             const box = new THREE.Box3().setFromObject(modelGroup);
@@ -726,6 +845,153 @@
             scene.background = new THREE.Color(backgrounds[backgroundIndex]);
         }
 
+        function toggleSimulation() {
+            isSimulating = !isSimulating;
+            const btn = document.getElementById('btnSimular');
+            if (isSimulating) {
+                btn.textContent = 'Parar';
+                btn.style.background = '#F44336';
+            } else {
+                btn.textContent = 'Simular';
+                btn.style.background = '#00ff88';
+            }
+        }
+
+        function setupMechanicalGroups() {
+            // Funcao recursiva para criar sub-grupos
+            function createSubGroups(parentGroup, parentPivot, subGroupsConfig, parentName) {
+                if (!subGroupsConfig) return;
+
+                for (const [subName, subConfig] of Object.entries(subGroupsConfig)) {
+                    const subGroup = new THREE.Group();
+                    const subPivot = new THREE.Vector3(...subConfig.pivot);
+
+                    // Posicionar sub-grupo relativo ao grupo pai
+                    subGroup.position.copy(subPivot).sub(parentPivot);
+
+                    // Mover pecas do sub-grupo
+                    subConfig.parts.forEach(partIndex => {
+                        const mesh = partMeshes[partIndex];
+                        if (mesh) {
+                            // Remover do modelGroup (se ainda estiver la)
+                            modelGroup.remove(mesh);
+
+                            // Ajustar posicao relativa ao pivo do sub-grupo
+                            mesh.position.sub(subPivot);
+
+                            // Adicionar ao sub-grupo
+                            subGroup.add(mesh);
+                        }
+                    });
+
+                    // Recursivamente criar sub-sub-grupos
+                    if (subConfig.subGroups) {
+                        createSubGroups(subGroup, subPivot, subConfig.subGroups, `${parentName}_${subName}`);
+                    }
+
+                    // Adicionar sub-grupo ao grupo pai
+                    parentGroup.add(subGroup);
+                    const fullName = `${parentName}_${subName}`;
+                    mechGroups[fullName] = subGroup;
+
+                    console.log(`  Sub-grupo '${fullName}' criado com ${subConfig.parts.length} pecas`);
+                }
+            }
+
+            // Para cada grupo mecanico principal, criar um Group do Three.js
+            for (const [name, config] of Object.entries(mechanicalGroups)) {
+                const group = new THREE.Group();
+                const pivot = new THREE.Vector3(...config.pivot);
+
+                // Posicionar o grupo no ponto de pivo
+                group.position.copy(pivot);
+
+                // Mover cada peca do grupo
+                config.parts.forEach(partIndex => {
+                    const mesh = partMeshes[partIndex];
+                    if (mesh) {
+                        // Remover do modelGroup
+                        modelGroup.remove(mesh);
+
+                        // Ajustar posicao relativa ao pivo
+                        mesh.position.sub(pivot);
+
+                        // Adicionar ao grupo mecanico
+                        group.add(mesh);
+                    }
+                });
+
+                // Criar sub-grupos recursivamente
+                createSubGroups(group, pivot, config.subGroups, name);
+
+                // Adicionar grupo ao modelGroup
+                modelGroup.add(group);
+                mechGroups[name] = group;
+
+                console.log(`Grupo mecanico '${name}' criado com ${config.parts.length} pecas`);
+            }
+        }
+
+        function animateParts() {
+            if (!isSimulating) return;
+
+            // Animar pecas individuais (rotacao continua)
+            for (const [index, config] of Object.entries(animatedParts)) {
+                const mesh = partMeshes[parseInt(index)];
+                if (mesh) {
+                    switch (config.axis) {
+                        case 'x':
+                            mesh.rotation.x += config.speed;
+                            break;
+                        case 'y':
+                            mesh.rotation.y += config.speed;
+                            break;
+                        case 'z':
+                            mesh.rotation.z += config.speed;
+                            break;
+                    }
+                }
+            }
+
+            // Animar grupos mecanicos
+            for (const [name, config] of Object.entries(mechanicalGroups)) {
+                const group = mechGroups[name];
+                if (group) {
+                    switch (config.axis) {
+                        case 'x':
+                            group.rotation.x += config.speed;
+                            break;
+                        case 'y':
+                            group.rotation.y += config.speed;
+                            break;
+                        case 'z':
+                            group.rotation.z += config.speed;
+                            break;
+                    }
+                }
+
+                // Animar sub-grupos (rotacao composta - giram dentro do grupo pai)
+                if (config.subGroups) {
+                    for (const [subName, subConfig] of Object.entries(config.subGroups)) {
+                        const subGroup = mechGroups[`${name}_${subName}`];
+                        if (subGroup) {
+                            switch (subConfig.axis) {
+                                case 'x':
+                                    subGroup.rotation.x += subConfig.speed;
+                                    break;
+                                case 'y':
+                                    subGroup.rotation.y += subConfig.speed;
+                                    break;
+                                case 'z':
+                                    subGroup.rotation.z += subConfig.speed;
+                                    break;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
         function onDoubleClick(event) {
             const rect = renderer.domElement.getBoundingClientRect();
             const mouse = new THREE.Vector2(
@@ -752,6 +1018,7 @@
         function animate() {
             requestAnimationFrame(animate);
             controls.update();
+            animateParts();
             renderer.render(scene, camera);
         }
 
