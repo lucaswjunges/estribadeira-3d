@@ -1159,7 +1159,19 @@
             renderer.setSize(window.innerWidth, window.innerHeight);
         }
 
+        // Ocultar painel em dispositivos moveis
+        function checkMobile() {
+            if (window.innerWidth <= 768) {
+                const panel = document.getElementById('legendPanel');
+                const toggle = document.getElementById('legendToggle');
+                panel.classList.add('hidden');
+                toggle.classList.add('panel-hidden');
+                toggle.textContent = '☰ Peças';
+            }
+        }
+
         // Iniciar
+        checkMobile();
         init();
     </script>
 </body>
