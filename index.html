@@ -154,6 +154,38 @@
             max-width: 280px;
             max-height: calc(100vh - 200px);
             overflow-y: auto;
+            transition: transform 0.3s ease, opacity 0.3s ease;
+        }
+
+        .legend-panel.hidden {
+            transform: translateX(320px);
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        .legend-toggle {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: rgba(26, 26, 26, 0.95);
+            color: #00ff88;
+            border: 1px solid #3a3a3a;
+            padding: 10px 15px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: 600;
+            z-index: 99;
+            transition: all 0.2s;
+        }
+
+        .legend-toggle:hover {
+            background: #00ff88;
+            color: #1a1a1a;
+        }
+
+        .legend-panel:not(.hidden) ~ .legend-toggle {
+            right: 310px;
         }
 
         .legend-panel h4 {
@@ -264,6 +296,7 @@
         <p>Duplo clique: Centralizar</p>
     </div>
 
+    <button class="legend-toggle" id="legendToggle" onclick="toggleLegend()">☰ Peças</button>
     <div class="legend-panel" id="legendPanel">
         <h4>Pecas do Modelo</h4>
         <div class="legend-stats" id="legendStats">Carregando...</div>
@@ -872,6 +905,19 @@
         function cycleBackground() {
             backgroundIndex = (backgroundIndex + 1) % backgrounds.length;
             scene.background = new THREE.Color(backgrounds[backgroundIndex]);
+        }
+
+        function toggleLegend() {
+            const panel = document.getElementById('legendPanel');
+            const toggle = document.getElementById('legendToggle');
+            panel.classList.toggle('hidden');
+            if (panel.classList.contains('hidden')) {
+                toggle.textContent = '☰ Peças';
+                toggle.style.right = '20px';
+            } else {
+                toggle.textContent = '✕ Fechar';
+                toggle.style.right = '310px';
+            }
         }
 
         function toggleSimulation() {
