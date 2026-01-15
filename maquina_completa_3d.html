@@ -166,7 +166,7 @@
         .legend-toggle {
             position: absolute;
             top: 20px;
-            right: 20px;
+            right: 310px;
             background: rgba(26, 26, 26, 0.95);
             color: #00ff88;
             border: 1px solid #3a3a3a;
@@ -175,8 +175,8 @@
             cursor: pointer;
             font-size: 12px;
             font-weight: 600;
-            z-index: 99;
-            transition: all 0.2s;
+            z-index: 101;
+            transition: all 0.3s ease;
         }
 
         .legend-toggle:hover {
@@ -184,8 +184,8 @@
             color: #1a1a1a;
         }
 
-        .legend-panel:not(.hidden) ~ .legend-toggle {
-            right: 310px;
+        .legend-toggle.panel-hidden {
+            right: 20px;
         }
 
         .legend-panel h4 {
@@ -911,12 +911,11 @@
             const panel = document.getElementById('legendPanel');
             const toggle = document.getElementById('legendToggle');
             panel.classList.toggle('hidden');
+            toggle.classList.toggle('panel-hidden');
             if (panel.classList.contains('hidden')) {
                 toggle.textContent = '☰ Peças';
-                toggle.style.right = '20px';
             } else {
                 toggle.textContent = '✕ Fechar';
-                toggle.style.right = '310px';
             }
         }
 
